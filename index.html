@@ -262,7 +262,7 @@ nav.scrolled{background:rgba(247,245,240,0.93);backdrop-filter:blur(16px);border
 .logo-talento{font-family:'Outfit',sans-serif;font-size:30px;font-weight:900;color:#070f1e;letter-spacing:-.04em;line-height:1.05;white-space:nowrap}
 .logo-talento::after{content:'.ai';color:#1A5CE8}
 .logo-sub{display:flex;flex-direction:column;gap:0;margin-top:0}
-.logo-consulting{font-family:'Outfit',sans-serif;font-size:9px;font-weight:600;color:#9ca3af;letter-spacing:.16em;text-transform:uppercase;white-space:nowrap;border-top:2px solid #00B87A;padding-top:4px;margin-top:5px;font-size:0}
+.logo-consulting{font-family:'Outfit',sans-serif;font-size:9px;font-weight:600;color:#9ca3af;letter-spacing:.16em;text-transform:uppercase;white-space:nowrap;border-top:1px solid #00B87A;padding-top:4px;margin-top:5px;font-size:0}
 .logo-consulting::after{content:'consulting';font-family:'Outfit',sans-serif;font-size:9px;font-weight:600;color:#9ca3af;letter-spacing:.16em;text-transform:uppercase}
 .logo-ai{display:none}
 /* Footer variant */
@@ -476,6 +476,7 @@ nav.scrolled{background:rgba(247,245,240,0.93);backdrop-filter:blur(16px);border
 .iqs-blob1{width:600px;height:600px;top:-200px;right:-150px;background:radial-gradient(circle,rgba(26,92,232,.1) 0%,transparent 70%);animation-delay:0s}
 .iqs-blob2{width:400px;height:400px;bottom:-100px;left:-80px;background:radial-gradient(circle,rgba(232,87,42,.07) 0%,transparent 70%);animation-delay:6s}
 @keyframes blob-drift{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(30px,-25px) scale(1.06)}66%{transform:translate(-20px,20px) scale(.95)}}
+@keyframes cs-pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(232,87,42,.5)}50%{opacity:.78;box-shadow:0 0 0 6px rgba(232,87,42,0)}}
 .iqs-grid{display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center;position:relative;z-index:1}
 .iqs-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(90,143,245,.1);border:1px solid rgba(90,143,245,.2);border-radius:100px;padding:7px 18px;margin-bottom:28px}
 .iqs-badge span{font-size:12px;font-weight:700;color:var(--blue-lt);letter-spacing:.08em}
@@ -709,7 +710,301 @@ nav.dark .mob-menu-btn span{background:#fff}
 .mob-nav a{font-size:24px;font-weight:700;color:#fff;padding:18px 0;border-bottom:1px solid rgba(255,255,255,.08);width:100%;text-align:center;letter-spacing:-.02em}
 .mob-nav a:last-child{border:none}
 .mob-nav-close{position:absolute;top:20px;right:24px;background:none;border:none;color:#fff;font-size:28px;cursor:pointer;line-height:1}
+.mob-nav a{-webkit-tap-highlight-color:transparent}
+
+/* ════════════════════════════════════════════════════════════
+   COMPREHENSIVE RESPONSIVE OVERRIDES
+   Breakpoints: 1100 · 900 · 767 · 480 · 360
+   + Cross-browser compatibility layer
+   ════════════════════════════════════════════════════════════ */
+
+/* ── Global: fluid section padding ── */
+.section{padding:clamp(48px,8vw,96px) clamp(20px,5.5vw,72px)}
+[style*="padding:96px 72px"],[style*="padding:100px 72px"]{padding:clamp(56px,8vw,100px) clamp(20px,5.5vw,72px)!important}
+
+/* ── Fluid typography for key elements ── */
+.logo-talento{font-size:clamp(22px,3.5vw,30px)!important}
+.stat-n,.stat-num{font-size:clamp(28px,4vw,52px)!important}
+.hero-h1{font-size:clamp(34px,5.5vw,72px)}
+
+/* ── Cross-browser animation prefixes ── */
+@-webkit-keyframes cs-pulse{0%,100%{opacity:1;-webkit-box-shadow:0 0 0 0 rgba(232,87,42,.5)}50%{opacity:.78;-webkit-box-shadow:0 0 0 6px rgba(232,87,42,0)}}
+@-webkit-keyframes blob-drift{0%,100%{-webkit-transform:translate(0,0) scale(1)}33%{-webkit-transform:translate(30px,-25px) scale(1.06)}66%{-webkit-transform:translate(-20px,20px) scale(.95)}}
+@-webkit-keyframes tick{from{-webkit-transform:translateX(0)}to{-webkit-transform:translateX(-50%)}}
+@-webkit-keyframes fade-up{from{opacity:0;-webkit-transform:translateY(24px)}to{opacity:1;-webkit-transform:translateY(0)}}
+@-webkit-keyframes pulse-dot{0%,100%{opacity:1;-webkit-transform:scale(1)}50%{opacity:.5;-webkit-transform:scale(.8)}}
+
+/* Apply -webkit- transforms to animated elements */
+.hb1,.hb2,.iqs-blob1,.iqs-blob2{-webkit-animation:blob-drift 18s ease-in-out infinite;animation:blob-drift 18s ease-in-out infinite}
+.ticker-inner{-webkit-animation:tick 32s linear infinite;animation:tick 32s linear infinite}
+.fade-up{-webkit-transition:opacity .6s ease,-webkit-transform .6s ease;transition:opacity .6s ease,transform .6s ease}
+.fade-up.visible{-webkit-transform:translateY(0);transform:translateY(0)}
+[style*="animation:cs-pulse"]{-webkit-animation:cs-pulse 2.4s ease-in-out infinite;animation:cs-pulse 2.4s ease-in-out infinite}
+
+/* Touch improvements */
+button,a,[onclick]{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+html{-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}
+*{-webkit-box-sizing:border-box;box-sizing:border-box}
+
+/* Prevent horizontal scroll globally */
+html,body{max-width:100vw;overflow-x:hidden}
+
+/* ── 1100px — Large tablet landscape ── */
+@media(max-width:1100px){
+  nav{padding:0 24px}
+  .section{padding:72px 36px}
+  .hero-left{padding:100px 32px 56px}
+  .footer-top,[style*="grid-template-columns:2fr 1fr 1fr 1fr"]{grid-template-columns:repeat(2,1fr)!important;gap:32px!important}
+  .stat-strip,.stats-inner{grid-template-columns:repeat(2,1fr)!important;gap:16px!important}
+  .stat-cell{padding:28px 24px!important}
+  [style*="padding:96px 72px"],[style*="padding:100px 72px"]{padding:72px 32px!important}
+}
+
+/* ── 900px — Small tablet / large phone landscape ── */
+@media(max-width:900px){
+  /* Navigation */
+  nav{padding:0 20px}
+  .nav-links{gap:12px;font-size:13px}
+  .nav-pill{display:none}
+
+  /* Sections */
+  .section{padding:56px 24px}
+  [style*="padding:96px 72px"],[style*="padding:100px 72px"]{padding:56px 24px!important}
+
+  /* Hero */
+  .hero-left{padding:96px 24px 48px}
+  .hero{min-height:auto}
+
+  /* All 3-column grids → 2 column */
+  .disciplines-wrap,.iqs-pillars-grid,
+  [style*="grid-template-columns:repeat(3,1fr)"]{grid-template-columns:repeat(2,1fr)!important;gap:16px!important}
+
+  /* Models → single column */
+  .models-grid{grid-template-columns:1fr!important;gap:16px!important}
+  .model-card.featured [style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr!important;gap:24px!important}
+  .model-card.featured [style*="gap:48px"]{gap:24px!important}
+
+  /* Forms → single column */
+  .form-grid{grid-template-columns:1fr!important;gap:12px!important}
+  [style*="grid-template-columns:1fr 1fr;gap:10px"]{grid-template-columns:1fr!important;gap:10px!important}
+  [style*="grid-template-columns:1fr 1fr;gap:14px"]{grid-template-columns:1fr!important;gap:10px!important}
+
+  /* Contact section → stack */
+  .contact-section,[style*="grid-template-columns:1fr 1fr;gap:80px"]{grid-template-columns:1fr!important;gap:32px!important}
+  [style*="grid-template-columns:1fr 1fr;gap:72px"]{grid-template-columns:1fr!important;gap:28px!important}
+
+  /* IQS section gap reduce */
+  .iqs-grid{gap:40px!important}
+
+  /* Stats */
+  .stat-strip,.stats-inner{grid-template-columns:repeat(2,1fr)!important;gap:14px!important}
+  .stat-cell{padding:24px 20px!important}
+  .stat-n,.stat-num{font-size:clamp(28px,5vw,44px)!important}
+
+  /* Footer */
+  .footer-top,[style*="grid-template-columns:2fr 1fr 1fr 1fr"]{grid-template-columns:repeat(2,1fr)!important;gap:28px!important}
+  footer,[style*="padding:60px 72px"]{padding:48px 24px 28px!important}
+
+  /* Engage steps */
+  .engage-steps::before{display:none!important}
+
+  /* IQS coming soon pillars */
+  [style*="grid-template-columns:repeat(3,1fr)"].iqs-pillars-grid,
+  .iqs-pillars-grid{grid-template-columns:1fr!important}
+
+  /* Reduce big inline gaps */
+  [style*="gap:80px"]{gap:40px!important}
+  [style*="gap:72px"]{gap:32px!important}
+  [style*="padding:100px 72px"]{padding:60px 28px!important}
+}
+
+/* ── 767px — Mobile portrait (augmenting existing) ── */
+@media(max-width:767px){
+  /* Logo size on mobile */
+  .logo-talento{font-size:24px!important}
+
+  /* Better hero */
+  .hero-left{padding:84px 20px 44px}
+  .hero{min-height:auto!important}
+  .hero-h1{font-size:clamp(32px,9vw,48px)}
+  [style*="font-size:clamp(42px"]{font-size:clamp(32px,9vw,48px)!important}
+
+  /* Section padding */
+  .section{padding:48px 20px}
+  [style*="padding:96px 72px"],[style*="padding:100px 72px"]{padding:48px 20px!important}
+  [style*="padding:80px 72px"]{padding:48px 20px!important}
+
+  /* All grids single column */
+  .models-grid,.disciplines-wrap,.iqs-pillars-grid,
+  .footer-top,.stats-inner,.stat-strip,
+  [style*="grid-template-columns:repeat(3,1fr)"],
+  [style*="grid-template-columns:repeat(2,1fr)"],
+  [style*="grid-template-columns:1fr 1fr"],
+  [style*="grid-template-columns:2fr 1fr 1fr 1fr"],
+  [style*="grid-template-columns:54%"]{grid-template-columns:1fr!important;gap:16px!important}
+
+  /* Stats keep 2-col on mobile */
+  .stat-strip,.stats-inner{grid-template-columns:repeat(2,1fr)!important}
+  .stat-cell{padding:20px 16px!important}
+  .stat-n,.stat-num{font-size:clamp(26px,7vw,38px)!important}
+
+  /* IQS */
+  .iqs-grid{grid-template-columns:1fr!important;gap:28px!important}
+  .iqs-section,[style*="padding:96px 72px"]{padding:48px 20px!important}
+
+  /* Forms */
+  .form-grid,[style*="grid-template-columns:1fr 1fr;gap:10px"],
+  [style*="grid-template-columns:1fr 1fr;gap:14px"]{grid-template-columns:1fr!important;gap:10px!important}
+  .form-box{padding:24px 20px}
+  .form-input,.form-select,.form-ta{font-size:16px!important} /* prevent iOS zoom */
+
+  /* Testimonials */
+  .testi-card{min-width:calc(100vw - 48px)!important;max-width:calc(100vw - 48px)!important}
+
+  /* Footer */
+  .footer-top{grid-template-columns:1fr 1fr!important;gap:24px!important}
+  footer{padding:40px 20px 24px!important}
+  .footer-btm{flex-wrap:wrap;gap:12px;font-size:11px}
+  [style*="padding:60px 72px"]{padding:40px 20px!important}
+
+  /* IQS platform section */
+  [style*="padding:100px 72px"]{padding:56px 20px!important}
+
+  /* Coming soon section CTA strip */
+  [style*="display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap"]{flex-direction:column!important;align-items:flex-start!important;gap:20px!important}
+
+  /* Process steps */
+  .engage-steps{flex-direction:column!important;gap:16px!important}
+  .engage-steps::before{display:none!important}
+
+  /* Hide decorative absolute elements */
+  [style*="position:absolute;right:72px"],[style*="position:absolute;right:60px"],[style*="position:absolute;bottom:80px"]{display:none!important}
+
+  /* About page stats inline */
+  [style*="grid-template-columns:repeat(4,1fr)"]{grid-template-columns:repeat(2,1fr)!important;gap:14px!important}
+
+  /* Typography scale */
+  h2{font-size:clamp(26px,7vw,38px)!important}
+  .iqs-left h2{font-size:clamp(28px,7.5vw,40px)!important}
+  .model-num{font-size:clamp(36px,10vw,56px)!important}
+
+  /* Gaps */
+  [style*="gap:80px"]{gap:28px!important}
+  [style*="gap:72px"]{gap:24px!important}
+  [style*="gap:60px"]{gap:20px!important}
+
+  /* Mobile nav font */
+  .mob-nav a{font-size:20px;padding:15px 0}
+}
+
+/* ── 480px — Small phones ── */
+@media(max-width:480px){
+  nav{padding:0 16px;height:58px}
+  .logo-talento{font-size:20px!important}
+
+  .section{padding:40px 16px}
+  [style*="padding:96px 72px"],[style*="padding:100px 72px"],[style*="padding:80px"]{padding:40px 16px!important}
+
+  .hero-left{padding:76px 16px 36px}
+  .hero-h1{font-size:clamp(28px,9vw,40px)}
+
+  .stat-strip,.stats-inner{grid-template-columns:1fr 1fr!important;gap:10px!important}
+  .stat-cell{padding:16px 12px!important}
+  .stat-n,.stat-num{font-size:clamp(24px,8vw,34px)!important}
+
+  .form-box{padding:20px 16px}
+  .model-card{padding:28px 20px!important}
+  .iqs-section{padding:40px 16px!important}
+
+  /* Single col everything */
+  .footer-top{grid-template-columns:1fr!important}
+  .testi-card{min-width:calc(100vw - 32px)!important;max-width:calc(100vw - 32px)!important}
+
+  /* Buttons: full width on very small screens */
+  .hero-actions{flex-direction:column!important;gap:12px!important}
+  .hero-actions button,.hero-actions a{width:100%!important;justify-content:center!important}
+
+  /* Inline resource/tool cards */
+  [style*="grid-template-columns:repeat(3,1fr)"],[style*="grid-template-columns:repeat(2,1fr)"]{grid-template-columns:1fr!important}
+
+  h2{font-size:clamp(24px,8vw,34px)!important}
+  .mob-nav a{font-size:18px;padding:13px 0}
+}
+
+/* ── 360px — Very small phones ── */
+@media(max-width:360px){
+  nav{padding:0 12px}
+  .logo-talento{font-size:18px!important}
+  .section{padding:36px 14px}
+  .hero-h1{font-size:clamp(26px,8vw,34px)}
+  .stat-strip,.stats-inner{grid-template-columns:1fr!important}
+}
+
+/* ── Safari / WebKit fixes ── */
+@supports(-webkit-touch-callout:none){
+  /* iOS Safari: fix 100vh */
+  .hero{min-height:-webkit-fill-available}
+  .mob-nav{min-height:-webkit-fill-available}
+  /* iOS input zoom prevention */
+  input,select,textarea{font-size:max(16px,1em)}
+}
+
+/* ── Firefox fixes ── */
+@-moz-document url-prefix(){
+  .ticker-inner{-moz-animation:tick 32s linear infinite}
+}
+
+/* ── Reduce motion (accessibility) ── */
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+  .ticker-inner{animation:none!important}
+  .testi-track{animation:none!important}
+}
 </style>
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script>
+/* ══════════════════════════════════════════════════
+   TALENTO DATA CAPTURE — FIREBASE FIRESTORE
+   ══════════════════════════════════════════════════
+   Paste your Firebase config here (same config as
+   talento-admin.html). Get it from:
+   console.firebase.google.com → your project → Web app
+   ════════════════════════════════════════════════ */
+const FIREBASE_CONFIG = {
+  apiKey:            "PASTE_YOUR_API_KEY_HERE",
+  authDomain:        "PASTE_YOUR_PROJECT_ID.firebaseapp.com",
+  projectId:         "PASTE_YOUR_PROJECT_ID",
+  storageBucket:     "PASTE_YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "PASTE_YOUR_SENDER_ID",
+  appId:             "PASTE_YOUR_APP_ID"
+};
+
+let _db = null;
+(function initFirebase(){
+  try {
+    if(FIREBASE_CONFIG.apiKey && !FIREBASE_CONFIG.apiKey.includes('PASTE')){
+      if(!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+      _db = firebase.firestore();
+      console.log('✅ Talento: Firestore connected — all form data captured to cloud');
+    } else {
+      console.warn('⚠️ Talento: Firebase not configured — form submissions will NOT be saved. Add your config from console.firebase.google.com');
+    }
+  } catch(e){ console.warn('Firebase init failed:', e); }
+})();
+
+/* Central data capture — Firestore cloud only */
+async function dataCapture(collection, record){
+  const entry = { ...record, timestamp: record.timestamp || new Date().toISOString() };
+  if(_db){
+    try { await _db.collection(collection).add(entry); }
+    catch(e){ console.warn('⚠️ Firestore write failed for '+collection+':', e); }
+  } else {
+    console.warn('⚠️ Data not saved — Firebase not configured. Paste your config into FIREBASE_CONFIG.');
+  }
+}
+</script>
 </head>
 <body>
 
@@ -774,7 +1069,7 @@ nav.dark .mob-menu-btn span{background:#fff}
       </div>
     </li>
     <li class="nav-dropdown">
-      <a href="#iqs">IQS™</a>
+      <a href="#iqs" style="display:inline-flex;align-items:center;gap:7px">IQS™ <span style="font-size:8px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;background:#E8572A;color:#fff;padding:2px 7px;border-radius:100px;animation:cs-pulse 2.4s ease-in-out infinite;line-height:1.4">Soon</span></a>
       <div class="nav-drop-menu">
         <a class="nav-drop-item" href="#iqs">
           <span class="nav-drop-num" style="color:#E8572A">01</span>
@@ -825,7 +1120,7 @@ nav.dark .mob-menu-btn span{background:#fff}
   <a href="talento-about.html" style="color:var(--blue)">Our Journey</a>
   <a href="#models" onclick="document.getElementById('mob-nav').classList.remove('open')">What we do</a>
   <a href="#disciplines" onclick="document.getElementById('mob-nav').classList.remove('open')">Disciplines</a>
-  <a href="#iqs" onclick="document.getElementById('mob-nav').classList.remove('open')">IQS™</a>
+  <a href="#iqs" onclick="document.getElementById('mob-nav').classList.remove('open')" style="display:inline-flex;align-items:center;gap:8px">IQS™ <span style="font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;background:#E8572A;color:#fff;padding:3px 9px;border-radius:100px;animation:cs-pulse 2.4s ease-in-out infinite">Soon</span></a>
   <a href="#resources" onclick="document.getElementById('mob-nav').classList.remove('open')">Resources</a>
   <a href="#role-analyser" onclick="document.getElementById('mob-nav').classList.remove('open')">Analyse a Role</a>
   <a href="#contact" onclick="document.getElementById('mob-nav').classList.remove('open')" style="color:var(--coral)">Start a project</a>
@@ -845,15 +1140,15 @@ nav.dark .mob-menu-btn span{background:#fff}
       <svg width="13" height="13" viewBox="0 0 32 32" fill="none"><rect x="0" y="16" width="8" height="16" rx="2" fill="#5A8FF5"/><rect x="11" y="8" width="8" height="24" rx="2" fill="#2a6ef5"/><rect x="22" y="0" width="8" height="32" rx="2" fill="#1A5CE8"/><circle cx="26" cy="4" r="4" fill="#E8572A"/></svg>
       <span style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.06em;text-transform:uppercase">Powered by IQS™</span>
     </div>
-    <a href="#iqs" style="display:inline-flex;align-items:center;gap:14px;background:rgba(26,92,232,.06);border:1px solid rgba(26,92,232,.18);border-radius:16px;padding:12px 18px 12px 12px;margin-bottom:24px;text-decoration:none;transition:background .2s" onmouseover="this.style.background='rgba(26,92,232,.1)'" onmouseout="this.style.background='rgba(26,92,232,.06)'">
+    <a href="#iqs" style="display:inline-flex;align-items:center;gap:14px;background:rgba(26,92,232,.06);border:1px solid rgba(26,92,232,.18);border-radius:16px;padding:14px 20px 14px 14px;margin-bottom:24px;text-decoration:none;transition:background .2s" onmouseover="this.style.background='rgba(26,92,232,.1)'" onmouseout="this.style.background='rgba(26,92,232,.06)'">
       <div style="width:40px;height:40px;border-radius:11px;background:rgba(26,92,232,.12);border:1px solid rgba(90,143,245,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0">
         <svg width="20" height="20" viewBox="0 0 32 32" fill="none"><rect x="0" y="16" width="8" height="16" rx="2.5" fill="#5A8FF5"/><rect x="11" y="8" width="8" height="24" rx="2.5" fill="#2a6ef5"/><rect x="22" y="0" width="8" height="32" rx="2.5" fill="#1A5CE8"/><circle cx="26" cy="4" r="5.5" fill="#E8572A"/><path d="M23.8 4l1.8 1.8 3-3" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </div>
       <div>
-        <div style="font-size:16px;font-weight:700;color:var(--dark);margin-bottom:5px">IQS™ Intelligent Qualification System <span style="font-weight:500;color:var(--muted);font-size:13px">built into every engagement</span></div>
-        <div style="display:flex;align-items:center;gap:6px">
-          <span style="font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;background:#00B87A;color:#fff;padding:2px 7px;border-radius:100px">Coming Soon</span>
-          <span style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--blue-lt)">Proprietary platform</span>
+        <div style="font-size:15px;font-weight:700;color:var(--dark);margin-bottom:8px">IQS™ Intelligent Qualification System <span style="font-weight:500;color:var(--muted);font-size:12px">built into every engagement</span></div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;background:#E8572A;color:#fff;padding:5px 12px;border-radius:100px;animation:cs-pulse 2.4s ease-in-out infinite"><span style="width:6px;height:6px;border-radius:50%;background:#fff;opacity:.85;flex-shrink:0"></span>Coming Soon</span>
+          <span style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--blue-lt)">Proprietary platform</span>
         </div>
       </div>
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style="margin-left:4px;flex-shrink:0"><path d="M2 7h10M8 3.5L11.5 7 8 10.5" stroke="var(--blue)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -1481,7 +1776,7 @@ nav.dark .mob-menu-btn span{background:#fff}
     <h2>Ready to build your <em>dream team?</em></h2>
     <p>Tell us what you're building and where the gaps are. We'll tell you exactly how to engage   RPO, hiring sprint, retained search, or consultancy. No hard sell.</p>
     <div class="contact-actions">
-      <button class="btn-white">Book a free discovery call <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M3 7.5h9M8.5 4l3.5 3.5L8.5 11" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button class="btn-white" onclick="document.getElementById('contact').scrollIntoView({behavior:'smooth'})">Book a free discovery call <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M3 7.5h9M8.5 4l3.5 3.5L8.5 11" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <button class="btn-ghost" onclick="document.getElementById('iqs').scrollIntoView({behavior:'smooth'})">See IQS™</button>
     </div>
     <div style="margin-top:44px;padding-top:36px;border-top:1px solid #1e3050">
@@ -1492,14 +1787,14 @@ nav.dark .mob-menu-btn span{background:#fff}
   <div class="form-box fade-up d2">
     <div class="form-title">Drop us a message</div>
     <div class="form-grid">
-      <div class="form-row"><label>First name</label><input class="form-input" type="text" placeholder="Jane"></div>
-      <div class="form-row"><label>Last name</label><input class="form-input" type="text" placeholder="Smith"></div>
+      <div class="form-row"><label>First name</label><input class="form-input" type="text" id="contact-first" placeholder="Jane"></div>
+      <div class="form-row"><label>Last name</label><input class="form-input" type="text" id="contact-last" placeholder="Smith"></div>
     </div>
-    <div class="form-row"><label>Work email</label><input class="form-input" type="email" placeholder="jane@company.com"></div>
-    <div class="form-row"><label>Company</label><input class="form-input" type="text" placeholder="Acme Inc."></div>
+    <div class="form-row"><label>Work email</label><input class="form-input" type="email" id="contact-email" placeholder="jane@company.com"></div>
+    <div class="form-row"><label>Company</label><input class="form-input" type="text" id="contact-company" placeholder="Acme Inc."></div>
     <div class="form-row">
       <label>Engagement type</label>
-      <select class="form-select">
+      <select class="form-select" id="contact-engagement">
         <option value="">Select...</option>
         <option>Embedded RPO</option>
         <option>Project-Based Hiring Sprint</option>
@@ -1509,8 +1804,8 @@ nav.dark .mob-menu-btn span{background:#fff}
         <option>Not sure yet   let's chat</option>
       </select>
     </div>
-    <div class="form-row"><label>Tell us more</label><textarea class="form-ta" placeholder="What roles, how many, and when do you need them by?"></textarea></div>
-    <button class="form-submit">Send message →</button>
+    <div class="form-row"><label>Tell us more</label><textarea class="form-ta" id="contact-message" placeholder="What roles, how many, and when do you need them by?"></textarea></div>
+    <button class="form-submit" id="contact-submit" onclick="submitContactForm()">Send message →</button>
   </div>
 </section>
 
@@ -1628,10 +1923,11 @@ function launchRoleAnalyser(path) {
     return;
   }
 
-  // Store lead in localStorage
-  const leads = JSON.parse(localStorage.getItem('role_analyser_leads') || '[]');
-  leads.push({ name: first + (last ? ' ' + last : ''), company, email, stage, path, ts: new Date().toISOString() });
-  localStorage.setItem('role_analyser_leads', JSON.stringify(leads));
+  const ts = new Date().toISOString();
+  const raRecord = { name: first + (last ? ' ' + last : ''), company, email, stage, role: path, timestamp: ts, source: 'Role Analyser · talentoconsulting.ai' };
+  const jobRecord = { company, contact_name: first + (last ? ' ' + last : ''), email, job_title: path || 'Role analysis', role: path, notes: 'From IQS™ Role Analyser — Stage: ' + (stage||'n/a'), timestamp: ts, source: 'Role Analyser · talentoconsulting.ai' };
+  dataCapture('role_analyser_leads', raRecord);
+  dataCapture('iqs_job_uploads', jobRecord);
 
   // Fire email notification
   fetch('https://formsubmit.co/ajax/mw@talentoconsulting.ai', {
@@ -1725,10 +2021,13 @@ function launchRoleAnalyser(path) {
           <div><label style="display:block;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#7a90ae;margin-bottom:6px">Last name</label><input class="form-input" type="text" placeholder="Smith" id="cv-last"></div>
         </div>
         <div style="margin-bottom:10px"><label style="display:block;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#7a90ae;margin-bottom:6px">Email</label><input class="form-input" type="email" placeholder="jane@email.com" id="cv-email"></div>
+        <div style="margin-bottom:10px"><label style="display:block;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#7a90ae;margin-bottom:6px">Phone number</label><input class="form-input" type="tel" placeholder="+44 7700 900000" id="cv-phone"></div>
+        <div style="margin-bottom:10px"><label style="display:block;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#7a90ae;margin-bottom:6px">Current employer</label><input class="form-input" type="text" placeholder="Company name" id="cv-employer"></div>
+        <div style="margin-bottom:10px"><label style="display:block;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#7a90ae;margin-bottom:6px">Current job title</label><input class="form-input" type="text" placeholder="e.g. Senior Product Manager" id="cv-current-title"></div>
         <div style="margin-bottom:10px"><label style="display:block;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#7a90ae;margin-bottom:6px">LinkedIn profile URL</label><input class="form-input" type="url" placeholder="linkedin.com/in/janesmith" id="cv-linkedin"></div>
-        <div style="margin-bottom:16px">
-          <label style="display:block;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#7a90ae;margin-bottom:6px">Current / most recent role type</label>
-          <select class="form-select" id="cv-role-type"><option value="">Select…</option><option>Account Executive</option><option>SDR / BDR</option><option>Solutions Engineer</option><option>Customer Success</option><option>Revenue Operations</option><option>Sales Leader / VP</option><option>Product Manager</option><option>Software Engineer</option><option>Engineering Manager</option><option>Other</option></select>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+          <div><label style="display:block;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#7a90ae;margin-bottom:6px">Salary expectation</label><input class="form-input" type="text" placeholder="e.g. £80k–£95k" id="cv-salary"></div>
+          <div><label style="display:block;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#7a90ae;margin-bottom:6px">Role type</label><select class="form-select" id="cv-role-type"><option value="">Select…</option><option>Account Executive</option><option>SDR / BDR</option><option>Solutions Engineer</option><option>Customer Success</option><option>Revenue Operations</option><option>Sales Leader / VP</option><option>Product Manager</option><option>Software Engineer</option><option>Engineering Manager</option><option>Other</option></select></div>
         </div>
 
         <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:12px;margin-top:4px">Step 2   Upload your CV</div>
@@ -1763,12 +2062,31 @@ function handleCvUpload(input){
 
 function submitCvAnalysis(){
   const first=document.getElementById('cv-first').value.trim();
+  const last=(document.getElementById('cv-last')||{value:''}).value.trim();
   const email=document.getElementById('cv-email').value.trim();
+  const phone=document.getElementById('cv-phone')?.value.trim()||'';
+  const employer=document.getElementById('cv-employer')?.value.trim()||'';
+  const currentTitle=document.getElementById('cv-current-title')?.value.trim()||'';
+  const salary=document.getElementById('cv-salary')?.value.trim()||'';
+  const roleType=document.getElementById('cv-role-type')?.value||'';
   const file=document.getElementById('cv-upload-input').files[0];
   if(!first||!email){alert('Please enter your name and email to continue.');return;}
   if(!file){alert('Please upload your CV first.');return;}
   const btn=document.getElementById('cv-submit-btn');
   btn.textContent='Analysing…';btn.disabled=true;btn.style.background='#1450cc';
+
+  const ts=new Date().toISOString();
+  const candidateRecord={
+    first_name:first,last_name:last,name:first+(last?' '+last:''),
+    email,phone,current_employer:employer,current_title:currentTitle||roleType,
+    job_title:currentTitle||roleType,salary_expectation:salary,
+    filename:file.name,filesize:(file.size/1024/1024).toFixed(2)+'MB',
+    timestamp:ts,source:'CV Analyser · talentoconsulting.ai'
+  };
+  // Store full profile in candidate_database + lightweight entry in cv_uploads
+  dataCapture('candidate_database', candidateRecord);
+  dataCapture('cv_uploads', {first_name:first,email,filename:file.name,filesize:candidateRecord.filesize,timestamp:ts,source:'CV Checker · talentoconsulting.ai'});
+
   setTimeout(()=>{
     btn.textContent='✓ Report on its way to '+email;
     btn.style.background='#2ea84a';
@@ -1787,9 +2105,9 @@ function submitCvAnalysis(){
 
     <!-- Header -->
     <div style="text-align:center;margin-bottom:56px">
-      <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(0,184,122,.1);border:1px solid rgba(0,184,122,.3);border-radius:100px;padding:6px 16px;margin-bottom:24px">
-        <span style="width:7px;height:7px;border-radius:50%;background:#00B87A;display:inline-block;animation:pulse-dot 1.8s ease-in-out infinite"></span>
-        <span style="font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#00B87A">Coming Soon</span>
+      <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(232,87,42,.1);border:1px solid rgba(232,87,42,.3);border-radius:100px;padding:6px 16px;margin-bottom:24px;animation:cs-pulse 2.4s ease-in-out infinite">
+        <span style="width:7px;height:7px;border-radius:50%;background:#E8572A;display:inline-block"></span>
+        <span style="font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#E8572A">Coming Soon</span>
       </div>
       <h2 style="font-size:clamp(36px,4.5vw,58px);font-weight:900;color:#fff;letter-spacing:-.04em;line-height:1.05;margin-bottom:20px">Introducing the<br><span style="color:#00B87A;display:inline-flex;align-items:center;gap:12px">
         <svg width="44" height="44" viewBox="0 0 32 32" fill="none" style="flex-shrink:0;vertical-align:middle"><rect x="0" y="16" width="8" height="16" rx="2.5" fill="#5A8FF5"/><rect x="11" y="8" width="8" height="24" rx="2.5" fill="#2a6ef5"/><rect x="22" y="0" width="8" height="32" rx="2.5" fill="#00B87A"/><circle cx="26" cy="4" r="5.5" fill="#E8572A"/><path d="M23.8 4l1.8 1.8 3-3" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -1833,7 +2151,7 @@ function submitCvAnalysis(){
         <div style="font-size:20px;font-weight:800;color:#fff;letter-spacing:-.02em;margin-bottom:6px">Be first to know when IQS™ goes live</div>
         <div style="font-size:14px;color:#5a7a9a">The platform that transforms how talent decisions get made. Launching soon.</div>
       </div>
-      <a href="#contact" style="display:inline-flex;align-items:center;gap:8px;background:#00B87A;color:#fff;font-size:14px;font-weight:700;padding:14px 28px;border-radius:100px;text-decoration:none;flex-shrink:0;transition:opacity .2s" onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">
+      <a href="#contact" onclick="logIqsInterest()" style="display:inline-flex;align-items:center;gap:8px;background:#00B87A;color:#fff;font-size:14px;font-weight:700;padding:14px 28px;border-radius:100px;text-decoration:none;flex-shrink:0;transition:opacity .2s" onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">
         Get early access
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7h10M8 3.5L11.5 7 8 10.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </a>
@@ -2143,6 +2461,8 @@ function joinCommunity() {
   const btn = document.getElementById('community-btn');
   btn.textContent = 'Joining…'; btn.disabled = true;
 
+  dataCapture('community_signups', { email, source: 'Community section · talentoconsulting.ai', timestamp: new Date().toISOString() });
+
   fetch('https://formsubmit.co/mw@talentoconsulting.ai', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
@@ -2160,6 +2480,82 @@ function joinCommunity() {
     btn.textContent = '✓ You\'re on the list!';
     btn.style.background = '#2ea84a';
   }, 800);
+}
+
+function logIqsInterest() {
+  const sessionKey = 'iqs_interest_logged_' + new Date().toDateString();
+  if (sessionStorage.getItem(sessionKey)) return;
+  sessionStorage.setItem(sessionKey, '1');
+  dataCapture('iqs_early_access', { name: 'Anonymous interest', email: '', company: '', message: 'Clicked Get Early Access button', timestamp: new Date().toISOString(), source: 'IQS Platform section · talentoconsulting.ai' });
+  // Pre-select IQS Demo in the contact form dropdown
+  setTimeout(() => {
+    const sel = document.getElementById('contact-engagement');
+    if (sel) { for(let i=0;i<sel.options.length;i++){ if(sel.options[i].text.includes('IQS')){ sel.selectedIndex=i; break; } } }
+  }, 600);
+}
+
+function submitContactForm() {
+  const firstName = document.getElementById('contact-first').value.trim();
+  const lastName = document.getElementById('contact-last').value.trim();
+  const email = document.getElementById('contact-email').value.trim();
+  const company = document.getElementById('contact-company').value.trim();
+  const engagement = document.getElementById('contact-engagement').value.trim();
+  const message = document.getElementById('contact-message').value.trim();
+
+  if (!firstName || !email) {
+    alert('Please enter your first name and work email.');
+    return;
+  }
+
+  const btn = document.getElementById('contact-submit');
+  btn.textContent = '⏳ Sending...';
+  btn.disabled = true;
+
+  const payload = {
+    _subject: '💼 Contact Form: ' + firstName + (lastName ? ' ' + lastName : '') + (company ? ' at ' + company : ''),
+    _replyto: email,
+    _captcha: 'false',
+    firstName,
+    lastName: lastName || ' ',
+    email,
+    company: company || ' ',
+    engagement: engagement || ' ',
+    message: message || ' ',
+    source: 'Contact form   website',
+    submittedAt: new Date().toLocaleString()
+  };
+
+  fetch('https://formsubmit.co/mw@talentoconsulting.ai', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    body: JSON.stringify(payload)
+  }).then(res => {
+    // Capture lead to Firestore + localStorage
+    dataCapture('talento_leads', {
+      first_name: firstName, last_name: lastName, name: firstName+' '+lastName,
+      email, company, engagement, message,
+      timestamp: new Date().toISOString(),
+      source: 'Contact form · talentoconsulting.ai'
+    });
+
+    btn.textContent = '✓ Message sent! We\'ll be in touch soon.';
+    btn.style.background = '#2ea84a';
+    setTimeout(() => {
+      document.getElementById('contact-first').value = '';
+      document.getElementById('contact-last').value = '';
+      document.getElementById('contact-email').value = '';
+      document.getElementById('contact-company').value = '';
+      document.getElementById('contact-engagement').value = '';
+      document.getElementById('contact-message').value = '';
+      btn.textContent = 'Send message →';
+      btn.style.background = '';
+      btn.disabled = false;
+    }, 3000);
+  }).catch(() => {
+    btn.textContent = '✗ Error. Email hello@talentoconsulting.ai';
+    btn.style.background = '#dc2626';
+    btn.disabled = false;
+  });
 }
 </script>
 
@@ -2271,14 +2667,14 @@ function joinCommunity() {
       </div>
       <p>Specialist talent consultancy for Product, Engineering &amp; GTM teams. RPO, project-based hiring sprints, and retained search   powered by IQS™ AI screening.</p>
     </div>
-    <div class="footer-col"><h4>Engage</h4><ul><li><a href="#">Embedded RPO</a></li><li><a href="#">Hiring Sprints</a></li><li><a href="#">Retained Search</a></li><li><a href="#">Talent Consultancy</a></li><li><a href="#">IQS™ Platform</a></li></ul></div>
-    <div class="footer-col"><h4>Disciplines</h4><ul><li><a href="#">Go-to-Market</a></li><li><a href="#">Product</a></li><li><a href="#">Engineering</a></li><li><a href="#">Leadership</a></li></ul></div>
-    <div class="footer-col"><h4>Company</h4><ul><li><a href="#">About us</a></li><li><a href="#">Our team</a></li><li><a href="mailto:hello@talentoconsulting.ai">Contact</a></li><li><a href="#">LinkedIn</a></li><li><a href="#">Book a call</a></li></ul></div>
+    <div class="footer-col"><h4>Engage</h4><ul><li><a href="talentoconsulting-website-v2.html#models">Embedded RPO</a></li><li><a href="talentoconsulting-website-v2.html#models">Hiring Sprints</a></li><li><a href="talentoconsulting-website-v2.html#models">Retained Search</a></li><li><a href="talentoconsulting-website-v2.html#models">Talent Consultancy</a></li><li><a href="talentoconsulting-website-v2.html#iqs-platform">IQS™ Platform</a></li></ul></div>
+    <div class="footer-col"><h4>Disciplines</h4><ul><li><a href="talentoconsulting-website-v2.html#disciplines">Go-to-Market</a></li><li><a href="talentoconsulting-website-v2.html#disciplines">Product</a></li><li><a href="talentoconsulting-website-v2.html#disciplines">Engineering</a></li><li><a href="talentoconsulting-website-v2.html#disciplines">Leadership</a></li></ul></div>
+    <div class="footer-col"><h4>Company</h4><ul><li><a href="talento-about.html">About us</a></li><li><a href="talento-about.html">Our team</a></li><li><a href="mailto:hello@talentoconsulting.ai">Contact</a></li><li><a href="https://linkedin.com/company/talento-consulting-ai" target="_blank">LinkedIn</a></li><li><a href="talentoconsulting-website-v2.html#contact">Book a call</a></li></ul></div>
   </div>
   <div class="footer-btm">
     <span>© 2026 Talento Consulting AI Ltd. All rights reserved.</span>
     <span>talento IQS™ is a registered trademark of Talento Consulting AI Ltd.</span>
-    <div class="footer-links"><a href="#">Privacy</a><a href="#">Terms</a></div>
+    <div class="footer-links"><a href="#">Privacy</a><a href="#">Terms</a><a href="talento-admin.html" style="opacity:.35;font-size:10px">Admin</a></div>
   </div>
 </footer>
 
