@@ -950,20 +950,36 @@ nav{
 .mob-nav{padding-top:env(safe-area-inset-top,0px)}
 footer,.footer-btm{padding-bottom:calc(env(safe-area-inset-bottom,0px) + 24px)}
 
-/* Fix featured model card collapsing on mobile — override its internal grid */
+/* ── Mobile model cards & engage-steps ── */
 @media(max-width:900px){
-  .model-card.featured{grid-column:span 1;display:flex;flex-direction:column;gap:24px}
+  /* Force models-grid to a simple flex column — no grid span tricks */
+  .models-grid{display:flex!important;flex-direction:column!important;gap:16px!important}
+  /* Featured card: kill internal grid, stack content vertically */
+  .model-card.featured{
+    grid-column:unset!important;
+    display:flex!important;
+    flex-direction:column!important;
+    gap:20px!important;
+    width:100%!important;
+    box-sizing:border-box!important;
+  }
+  /* All model cards: full width, no overflow */
+  .model-card{width:100%!important;box-sizing:border-box!important}
+  /* Shrink the RPO rings visual so it doesn't dominate */
+  .rpo-visual{height:140px!important}
+  .rpo-rings{width:120px!important;height:120px!important}
 }
-@media(max-width:767px){
-  .model-card.featured{grid-column:span 1;display:flex;flex-direction:column;gap:20px}
+@media(max-width:480px){
+  /* Hide decorative RPO visual on very small screens */
+  .rpo-visual{display:none!important}
 }
 
 /* Fix engage-steps — must switch to flex, not just change flex-direction */
 @media(max-width:767px){
-  .engage-steps{display:flex;flex-direction:column;gap:16px;align-items:center}
+  .engage-steps{display:flex!important;flex-direction:column!important;gap:16px!important;align-items:center!important}
 }
 @media(max-width:480px){
-  .engage-steps{display:flex;flex-direction:column;gap:12px;align-items:stretch}
+  .engage-steps{display:flex!important;flex-direction:column!important;gap:12px!important;align-items:stretch!important}
   .engage-step{align-items:flex-start;text-align:left;padding:0 0 0 8px}
 }
 
