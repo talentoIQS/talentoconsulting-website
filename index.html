@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 
 <!-- ============================================================
      PRIMARY SEO
@@ -604,11 +604,11 @@ footer{background:#070f1e;padding:60px 72px 36px;color:#3a5070}
 
 /* Tablet: 768px – 1024px */
 @media(max-width:1024px){
-  nav{padding:0 28px}
+  nav{padding:env(safe-area-inset-top,0px) 28px 0}
   .nav-links{gap:18px}
   .section{padding:72px 36px}
   .hero{grid-template-columns:1fr;min-height:auto}
-  .hero-left{padding:120px 36px 60px}
+  .hero-left{padding:calc(100px + env(safe-area-inset-top,0px)) 36px 60px}
   .hero-right{display:none}
   .sh{max-width:100%}
   .models-grid{grid-template-columns:repeat(2,1fr)}
@@ -627,7 +627,7 @@ footer{background:#070f1e;padding:60px 72px 36px;color:#3a5070}
 
 /* Mobile: up to 767px */
 @media(max-width:767px){
-  nav{padding:0 20px;height:60px}
+  nav{padding:env(safe-area-inset-top,0px) 20px 0;height:calc(60px + env(safe-area-inset-top,0px))}
   .nav-links{display:none}
   .nav-pill{display:none}
 
@@ -639,7 +639,7 @@ footer{background:#070f1e;padding:60px 72px 36px;color:#3a5070}
   [style*="padding:100px 72px"]{padding:56px 20px!important}
   [style*="padding:64px"]{padding:32px 20px!important}
 
-  .hero-left{padding:90px 20px 48px}
+  .hero-left{padding:calc(80px + env(safe-area-inset-top,0px)) 20px 48px}
   .hero-right{display:none}
   .hero-h1{font-size:clamp(36px,10vw,52px)}
 
@@ -751,9 +751,9 @@ html,body{max-width:100vw;overflow-x:hidden}
 
 /* ── 1100px — Large tablet landscape ── */
 @media(max-width:1100px){
-  nav{padding:0 24px}
+  nav{padding:env(safe-area-inset-top,0px) 24px 0}
   .section{padding:72px 36px}
-  .hero-left{padding:100px 32px 56px}
+  .hero-left{padding:calc(90px + env(safe-area-inset-top,0px)) 32px 56px}
   .footer-top,[style*="grid-template-columns:2fr 1fr 1fr 1fr"]{grid-template-columns:repeat(2,1fr)!important;gap:32px!important}
   .stat-strip,.stats-inner{grid-template-columns:repeat(2,1fr)!important;gap:16px!important}
   .stat-cell{padding:28px 24px!important}
@@ -763,7 +763,7 @@ html,body{max-width:100vw;overflow-x:hidden}
 /* ── 900px — Small tablet / large phone landscape ── */
 @media(max-width:900px){
   /* Navigation */
-  nav{padding:0 20px}
+  nav{padding:env(safe-area-inset-top,0px) 20px 0;height:calc(64px + env(safe-area-inset-top,0px))}
   .nav-links{gap:12px;font-size:13px}
   .nav-pill{display:none}
 
@@ -772,7 +772,7 @@ html,body{max-width:100vw;overflow-x:hidden}
   [style*="padding:96px 72px"],[style*="padding:100px 72px"]{padding:56px 24px!important}
 
   /* Hero */
-  .hero-left{padding:96px 24px 48px}
+  .hero-left{padding:calc(88px + env(safe-area-inset-top,0px)) 24px 48px}
   .hero{min-height:auto}
 
   /* All 3-column grids → 2 column */
@@ -824,7 +824,7 @@ html,body{max-width:100vw;overflow-x:hidden}
   .logo-talento{font-size:24px!important}
 
   /* Better hero */
-  .hero-left{padding:84px 20px 44px}
+  .hero-left{padding:calc(76px + env(safe-area-inset-top,0px)) 20px 44px}
   .hero{min-height:auto!important}
   .hero-h1{font-size:clamp(32px,9vw,48px)}
   [style*="font-size:clamp(42px"]{font-size:clamp(32px,9vw,48px)!important}
@@ -899,13 +899,13 @@ html,body{max-width:100vw;overflow-x:hidden}
 
 /* ── 480px — Small phones ── */
 @media(max-width:480px){
-  nav{padding:0 16px;height:58px}
+  nav{padding:env(safe-area-inset-top,0px) 16px 0;height:calc(58px + env(safe-area-inset-top,0px))}
   .logo-talento{font-size:20px!important}
 
   .section{padding:40px 16px}
   [style*="padding:96px 72px"],[style*="padding:100px 72px"],[style*="padding:80px"]{padding:40px 16px!important}
 
-  .hero-left{padding:76px 16px 36px}
+  .hero-left{padding:calc(70px + env(safe-area-inset-top,0px)) 16px 36px}
   .hero-h1{font-size:clamp(28px,9vw,40px)}
 
   .stat-strip,.stats-inner{grid-template-columns:1fr 1fr!important;gap:10px!important}
@@ -940,6 +940,38 @@ html,body{max-width:100vw;overflow-x:hidden}
   .stat-strip,.stats-inner{grid-template-columns:1fr!important}
 }
 
+/* ── iOS safe-area / notch / Dynamic Island ── */
+nav{
+  padding-top:env(safe-area-inset-top,0px);
+  height:calc(68px + env(safe-area-inset-top,0px));
+}
+.hero{padding-top:calc(68px + env(safe-area-inset-top,0px))}
+.section{scroll-margin-top:calc(68px + env(safe-area-inset-top,0px))}
+.mob-nav{padding-top:env(safe-area-inset-top,0px)}
+footer,.footer-btm{padding-bottom:calc(env(safe-area-inset-bottom,0px) + 24px)}
+
+/* Fix featured model card collapsing on mobile — override its internal grid */
+@media(max-width:900px){
+  .model-card.featured{grid-column:span 1;display:flex;flex-direction:column;gap:24px}
+}
+@media(max-width:767px){
+  .model-card.featured{grid-column:span 1;display:flex;flex-direction:column;gap:20px}
+}
+
+/* Fix engage-steps — must switch to flex, not just change flex-direction */
+@media(max-width:767px){
+  .engage-steps{display:flex;flex-direction:column;gap:16px;align-items:center}
+}
+@media(max-width:480px){
+  .engage-steps{display:flex;flex-direction:column;gap:12px;align-items:stretch}
+  .engage-step{align-items:flex-start;text-align:left;padding:0 0 0 8px}
+}
+
+/* Contact bg text — prevent overflow bleed on mobile */
+@media(max-width:900px){
+  .contact-bg-t{display:none!important}
+}
+
 /* ── Safari / WebKit fixes ── */
 @supports(-webkit-touch-callout:none){
   /* iOS Safari: fix 100vh */
@@ -947,6 +979,12 @@ html,body{max-width:100vw;overflow-x:hidden}
   .mob-nav{min-height:-webkit-fill-available}
   /* iOS input zoom prevention */
   input,select,textarea{font-size:max(16px,1em)}
+  /* iOS safe area for nav on notch devices */
+  nav{
+    padding-top:env(safe-area-inset-top,0px);
+    height:calc(68px + env(safe-area-inset-top,0px));
+  }
+  .hero{padding-top:calc(68px + env(safe-area-inset-top,0px))}
 }
 
 /* ── Firefox fixes ── */
