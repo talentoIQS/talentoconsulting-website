@@ -553,6 +553,13 @@ nav.scrolled{background:rgba(247,245,240,0.93);backdrop-filter:blur(16px);border
 .form-ta::placeholder{color:#3d5470}
 .form-submit{width:100%;background:var(--blue);color:#fff;border:none;border-radius:100px;padding:13px;font-family:'Outfit',sans-serif;font-size:14px;font-weight:700;cursor:pointer;margin-top:6px;transition:all .22s}
 .form-submit:hover{background:#1450cc;box-shadow:0 8px 24px rgba(26,92,232,.4);transform:translateY(-1px)}
+/* Path buttons — CSS hover only (no inline onmouseover, works on touch) */
+.path-btn{display:flex;flex-direction:column;align-items:center;gap:6px;padding:16px 12px;border-radius:12px;cursor:pointer;transition:all .2s;color:#fff;font-family:'Outfit',sans-serif;border:1.5px dashed;width:100%;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.path-btn-blue{background:rgba(26,92,232,.12);border-color:rgba(90,143,245,.4)}
+.path-btn-blue:hover,.path-btn-blue:focus-visible{background:rgba(26,92,232,.22);border-color:#5A8FF5;outline:none}
+.path-btn-coral{background:rgba(232,87,42,.1);border-color:rgba(232,87,42,.3)}
+.path-btn-coral:hover,.path-btn-coral:focus-visible{background:rgba(232,87,42,.2);border-color:#E8572A;outline:none}
+@media(hover:none){.path-btn-blue:active{background:rgba(26,92,232,.22);border-color:#5A8FF5}.path-btn-coral:active{background:rgba(232,87,42,.2);border-color:#E8572A}}
 
 /* FOOTER */
 footer{background:#070f1e;padding:60px 72px 36px;color:#3a5070}
@@ -769,6 +776,7 @@ html,body{max-width:100vw;overflow-x:hidden}
 
   /* Sections */
   .section{padding:56px 24px}
+  .contact-section{padding:56px 24px!important}
   [style*="padding:96px 72px"],[style*="padding:100px 72px"]{padding:56px 24px!important}
 
   /* Hero */
@@ -831,6 +839,7 @@ html,body{max-width:100vw;overflow-x:hidden}
 
   /* Section padding */
   .section{padding:48px 20px}
+  .contact-section{padding:48px 20px!important}
   [style*="padding:96px 72px"],[style*="padding:100px 72px"]{padding:48px 20px!important}
   [style*="padding:80px 72px"]{padding:48px 20px!important}
 
@@ -903,6 +912,7 @@ html,body{max-width:100vw;overflow-x:hidden}
   .logo-talento{font-size:20px!important}
 
   .section{padding:40px 16px}
+  .contact-section{padding:40px 16px!important}
   [style*="padding:96px 72px"],[style*="padding:100px 72px"],[style*="padding:80px"]{padding:40px 16px!important}
 
   .hero-left{padding:calc(70px + env(safe-area-inset-top,0px)) 16px 36px}
@@ -1838,7 +1848,7 @@ async function dataCapture(collection, record){
       <p style="font-size:15px"><a href="mailto:hello@talentoconsulting.ai" style="color:var(--blue-lt);font-weight:600">hello@talentoconsulting.ai</a></p>
     </div>
   </div>
-  <div class="form-box fade-up d2">
+  <div class="form-box">
     <div class="form-title">Drop us a message</div>
     <div class="form-grid">
       <div class="form-row"><label>First name</label><input class="form-input" type="text" id="contact-first" placeholder="Jane"></div>
@@ -1917,7 +1927,7 @@ async function dataCapture(collection, record){
     </div>
 
     <!-- Right   lead capture + launch -->
-    <div class="fade-up d2" id="role-analyser-form">
+    <div id="role-analyser-form">
       <div style="background:var(--dark);border-radius:24px;padding:36px;border:1px solid rgba(90,143,245,.15);position:relative;overflow:hidden">
         <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#1A5CE8,#5A8FF5)"></div>
 
@@ -1945,12 +1955,12 @@ async function dataCapture(collection, record){
 
         <!-- Two path buttons -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
-          <button onclick="launchRoleAnalyser('upload')" style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:16px 12px;background:rgba(26,92,232,.12);border:1.5px dashed rgba(90,143,245,.4);border-radius:12px;cursor:pointer;transition:all .2s;color:#fff" onmouseover="this.style.background='rgba(26,92,232,.22)';this.style.borderColor='#5A8FF5'" onmouseout="this.style.background='rgba(26,92,232,.12)';this.style.borderColor='rgba(90,143,245,.4)'">
+          <button onclick="launchRoleAnalyser('upload')" class="path-btn path-btn-blue">
             <span style="font-size:22px">📎</span>
             <span style="font-size:12px;font-weight:700;color:#fff">Upload existing JD</span>
             <span style="font-size:10px;color:#3a5a80">PDF · Word · Excel</span>
           </button>
-          <button onclick="launchRoleAnalyser('build')" style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:16px 12px;background:rgba(232,87,42,.1);border:1.5px dashed rgba(232,87,42,.3);border-radius:12px;cursor:pointer;transition:all .2s;color:#fff" onmouseover="this.style.background='rgba(232,87,42,.2)';this.style.borderColor='#E8572A'" onmouseout="this.style.background='rgba(232,87,42,.1)';this.style.borderColor='rgba(232,87,42,.3)'">
+          <button onclick="launchRoleAnalyser('build')" class="path-btn path-btn-coral">
             <span style="font-size:22px">✏️</span>
             <span style="font-size:12px;font-weight:700;color:#fff">Build from scratch</span>
             <span style="font-size:10px;color:#6a85a0">~10 min · guided flow</span>
@@ -2057,7 +2067,7 @@ function launchRoleAnalyser(path) {
     </div>
 
     <!-- Right   Registration + upload form -->
-    <div class="fade-up d2" id="cv-analyser-form">
+    <div id="cv-analyser-form">
       <div style="background:#111e35;border:1px solid rgba(90,143,245,.18);border-radius:24px;padding:36px">
 
         <!-- Credit counter -->
