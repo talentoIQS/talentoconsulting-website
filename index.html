@@ -2881,5 +2881,19 @@ cEls.forEach(c=>cObs.observe(c));
   init();draw();
 })();
 </script>
+
+<script>
+// Fix hash anchor scrolling for overflow:hidden sections
+(function(){
+  function scrollToHash(){
+    var h=location.hash;
+    if(!h)return;
+    var el=document.getElementById(h.slice(1));
+    if(el) setTimeout(function(){el.scrollIntoView({behavior:'smooth',block:'start'});},80);
+  }
+  if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',scrollToHash);}else{scrollToHash();}
+  window.addEventListener('hashchange',scrollToHash);
+})();
+</script>
 </body>
 </html>
