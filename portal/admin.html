@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Portal Admin | Talento Consulting</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="portal.css">
+<!-- Talento Client Portal Admin - v1 (102626) -->
+</head>
+<body>
+<div id="app"><div class="loading">Loading admin…</div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script src="common.js"></script>
+<script>
+const { sb, cfg, esc, fmtDate, ago, safeName, BRAND, STAGES, stagePill, statusPill, toast, openFile } = TP;
+const app = document.getElementById('app');
+const STAGE_ALL = [...STAGES, 'On hold', 'Closed'];
+const STATUS_ALL = ['Presented', 'Client interview', 'Final round', 'Offer', 'Hired', 'On hold', 'Declined', 'Withdrawn'];
+const DOC_CATS = ['Job spec', 'Proposal', 'Market map', 'IQS report', 'Contract', 'General'];
+let S = { clients: [], client: null, members: [], searches: [], candidates: [], docs: [], feedback: [], tab: 'searches' };
+
+const opt = (list, v) => list.map((x) => `<option ${x === v ? 'selected' : ''}>${esc(x)}</option>`).join('');
+const val = (id) => document.getElementById(id)?.value.trim() || null;
+
+async function boot() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { location.href = './'; return; }
+  const { data: isAdmin } = await sb.rpc('is_admin');
+  if (!isAdmin) { app.innerHTML = `<div class="loading">This page is for Talento admins only. <a href="./" style="margin-left:6px">Go to portal</a></div>`; return; }
+  await loadClients(new URLSearchParams(location.search).get('client'));
+}
+
+async function loadClients(slug) {
+  const { data } = await sb.from('clients').select('*').order('name');
+  S.clients = data || [];
+  const c = S.clients.find((x) => x.slug === slug) || S.client && S.clients.find((x) => x.id === S.client.id) || S.clients[0];
+  if (c) await loadClient(c); else render();
+}
+
+async function loadClient(c) {
+  S.client = c;
+  history.replaceState(null, '', '?client=' + c.slug);
+  const [m, s, ca, d, f] = await Promise.all([
+    sb.rpc('admin_list_members', { p_client_id: c.id }),
+    sb.from('searches').select('*').eq('client_id', c.id).order('sort_order').order('created_at'),
+    sb.from('candidates').select('*').eq('client_id', c.id).order('sort_order').order('created_at'),
+    sb.from('documents').select('*').eq('client_id', c.id).order('created_at', { ascending: false }),
+    sb.from('feedback_view').select('*').eq('client_id', c.id).order('created_at', { ascending: false })
+  ]);
+  S.members = m.data || []; S.searches = s.data || []; S.candidates = ca.data || []; S.docs = d.data || []; S.feedback = f.data || [];
+  render();
+}
+
+function render() {
+  const c = S.client;
+  app.innerHTML = `
+  <header class="topbar"><div class="topbar-in">
+    <a class="brand" href="/">${BRAND}</a><span class="x">·</span><b>Portal admin</b>
+    <div class="spacer"></div>
+    ${c ? `<a class="btn btn-sm btn-ghost" href="./?client=${esc(c.slug)}">View as client</a>` : ''}
+    <button class="btn btn-sm btn-primary" id="out">Sign out</button>
+  </div></header>
+  <main class="wrap"><div class="admin-grid">
+    <aside>
+      <div class="eyebrow" style="margin-bottom:10px">Clients</div>
+      <div class="side-list">${S.clients.map((x) => `<button data-client="${x.id}" class="${c && x.id === c.id ? 'on' : ''}">${esc(x.name)}${x.active ? '' : ' <span class="meta">(inactive)</span>'}</button>`).join('')}</div>
+      <div class="card" style="margin-top:16px;padding:16px">
+        <b>New client</b>
+        <label class="field" style="margin-top:10px"><span>Name</span><input id="nc_name" placeholder="Acme Inc"></label>
+        <button class="btn btn-sm btn-primary" id="nc_go">Add client</button>
+      </div>
+    </aside>
+    <section>${c ? clientPanel(c) : '<div class="empty">Add your first client.</div>'}</section>
+  </div></main>`;
+  wire();
+}
+
+function clientPanel(c) {
+  const t = (id, l) => `<button class="tab ${S.tab === id ? 'on' : ''}" data-tab="${id}">${l}</button>`;
+  return `
+  <div class="hero" style="margin-bottom:12px"><div><div class="eyebrow">Client</div><h1 style="font-size:30px">${esc(c.name)}</h1>
+    <p class="meta">Portal link: ${esc(location.origin)}/portal/?client=${esc(c.slug)}</p></div></div>
+  <nav class="tabs">${t('searches', 'Searches')}${t('candidates', 'Candidates')}${t('documents', 'Documents')}${t('feedback', 'Feedback (' + S.feedback.length + ')')}${t('people', 'Client logins')}${t('settings', 'Branding')}</nav>
+  ${({ searches: tabSearches, candidates: tabCands, documents: tabDocs, feedback: tabFeedback, people: tabPeople, settings: tabSettings })[S.tab]()}`;
+}
+
+/* ---- Searches ---- */
+function tabSearches() {
+  return `<div class="section card"><h2>Add a search</h2>
+    <div class="form-row">
+      <label class="field"><span>Role title</span><input id="ns_title" placeholder="VP Sales, North America"></label>
+      <label class="field"><span>Location</span><input id="ns_loc" placeholder="Remote US"></label>
+      <label class="field"><span>Compensation</span><input id="ns_comp" placeholder="$250k OTE"></label>
+      <label class="field"><span>Stage</span><select id="ns_stage">${opt(STAGE_ALL, 'Kickoff')}</select></label>
+    </div>
+    <label class="field"><span>Summary (optional)</span><input id="ns_sum"></label>
+    <button class="btn btn-sm btn-primary" id="ns_go">Add search</button></div>
+  ${S.searches.length ? `<div class="card"><table class="table"><thead><tr><th style="width:24%">Role</th><th>Stage</th><th style="width:34%">Next steps (client sees this)</th><th>Location / comp</th><th></th></tr></thead><tbody>
+    ${S.searches.map((s) => `<tr data-row="${s.id}">
+      <td><input data-f="title" value="${esc(s.title)}"><textarea data-f="summary" rows="2" placeholder="Summary" style="margin-top:6px">${esc(s.summary || '')}</textarea></td>
+      <td><select data-f="stage">${opt(STAGE_ALL, s.stage)}</select><div class="meta" style="margin-top:6px">Updated ${ago(s.updated_at)}</div></td>
+      <td><textarea data-f="next_steps" rows="3">${esc(s.next_steps || '')}</textarea></td>
+      <td><input data-f="location" value="${esc(s.location || '')}" placeholder="Location"><input data-f="compensation" value="${esc(s.compensation || '')}" placeholder="Comp" style="margin-top:6px"></td>
+      <td style="white-space:nowrap"><button class="btn btn-sm btn-primary" data-save="searches">Save</button> <button class="btn-link" data-del="searches" style="color:var(--red)">Delete</button></td>
+    </tr>`).join('')}</tbody></table></div>` : ''}`;
+}
+
+/* ---- Candidates ---- */
+function tabCands() {
+  if (!S.searches.length) return `<div class="empty">Add a search first, then present candidates against it.</div>`;
+  return `<div class="section card"><h2>Present a candidate</h2>
+    <div class="form-row">
+      <label class="field"><span>Search</span><select id="nca_search">${S.searches.map((s) => `<option value="${s.id}">${esc(s.title)}</option>`).join('')}</select></label>
+      <label class="field"><span>Full name</span><input id="nca_name"></label>
+      <label class="field"><span>Current title</span><input id="nca_title"></label>
+      <label class="field"><span>Current company</span><input id="nca_co"></label>
+      <label class="field"><span>Location</span><input id="nca_loc"></label>
+      <label class="field"><span>LinkedIn URL</span><input id="nca_li"></label>
+    </div>
+    <label class="field"><span>Summary for the client</span><textarea id="nca_sum" rows="3"></textarea></label>
+    <label class="field"><span>IQS™ report (PDF, optional)</span><input type="file" id="nca_file" accept=".pdf,.doc,.docx"></label>
+    <button class="btn btn-sm btn-primary" id="nca_go">Add candidate</button></div>
+  ${S.candidates.length ? `<div class="card"><table class="table"><thead><tr><th style="width:26%">Candidate</th><th>Status</th><th style="width:30%">Summary</th><th>IQS™ report</th><th>Visible</th><th></th></tr></thead><tbody>
+    ${S.candidates.map((c) => `<tr data-row="${c.id}">
+      <td><input data-f="full_name" value="${esc(c.full_name)}"><input data-f="current_title" value="${esc(c.current_title || '')}" placeholder="Title" style="margin-top:6px"><input data-f="current_company" value="${esc(c.current_company || '')}" placeholder="Company" style="margin-top:6px">
+        <div class="meta" style="margin-top:6px">${esc(S.searches.find((s) => s.id === c.search_id)?.title || '')}</div></td>
+      <td><select data-f="status">${opt(STATUS_ALL, c.status)}</select></td>
+      <td><textarea data-f="summary" rows="4">${esc(c.summary || '')}</textarea><input data-f="linkedin_url" value="${esc(c.linkedin_url || '')}" placeholder="LinkedIn URL" style="margin-top:6px"></td>
+      <td>${c.iqs_report_path ? `<button class="btn-link" data-file="${esc(c.iqs_report_path)}">Open</button><br>` : ''}<input type="file" data-iqs="${c.id}" accept=".pdf,.doc,.docx" style="font-size:12px;border:0;padding:4px 0"></td>
+      <td><input type="checkbox" data-f="visible_to_client" ${c.visible_to_client ? 'checked' : ''} style="width:auto"></td>
+      <td style="white-space:nowrap"><button class="btn btn-sm btn-primary" data-save="candidates">Save</button> <button class="btn-link" data-del="candidates" style="color:var(--red)">Delete</button></td>
+    </tr>`).join('')}</tbody></table></div>` : ''}`;
+}
+
+/* ---- Documents ---- */
+function tabDocs() {
+  return `<div class="section card"><h2>Share a document</h2>
+    <div class="form-row">
+      <label class="field"><span>Title</span><input id="nd_title" placeholder="VP Sales job spec v2"></label>
+      <label class="field"><span>Type</span><select id="nd_cat">${opt(DOC_CATS, 'Job spec')}</select></label>
+      <label class="field"><span>Search (optional)</span><select id="nd_search"><option value="">None</option>${S.searches.map((s) => `<option value="${s.id}">${esc(s.title)}</option>`).join('')}</select></label>
+    </div>
+    <label class="field"><span>File</span><input type="file" id="nd_file"></label>
+    <button class="btn btn-sm btn-primary" id="nd_go">Upload &amp; share</button></div>
+  ${S.docs.length ? `<div class="card"><table class="table"><thead><tr><th>Title</th><th>Type</th><th>Added</th><th>Visible</th><th></th></tr></thead><tbody>
+    ${S.docs.map((d) => `<tr data-row="${d.id}"><td><input data-f="title" value="${esc(d.title)}"></td><td><select data-f="category">${opt(DOC_CATS, d.category)}</select></td>
+      <td class="meta">${fmtDate(d.created_at)}</td><td><input type="checkbox" data-f="visible_to_client" ${d.visible_to_client ? 'checked' : ''} style="width:auto"></td>
+      <td style="white-space:nowrap"><button class="btn-link" data-file="${esc(d.storage_path)}">Open</button> · <button class="btn btn-sm btn-primary" data-save="documents">Save</button> <button class="btn-link" data-del="documents" style="color:var(--red)">Delete</button></td></tr>`).join('')}
+  </tbody></table></div>` : ''}`;
+}
+
+/* ---- Feedback ---- */
+function tabFeedback() {
+  if (!S.feedback.length) return `<div class="empty">No client feedback yet.</div>`;
+  return `<div class="card"><table class="table"><thead><tr><th>When</th><th>Candidate</th><th>From</th><th>Decision</th><th>Comment</th></tr></thead><tbody>
+    ${S.feedback.map((f) => `<tr><td class="meta">${ago(f.created_at)}</td><td><b>${esc(S.candidates.find((c) => c.id === f.candidate_id)?.full_name || '')}</b></td>
+      <td>${esc(f.author_name)}</td><td>${f.decision ? `<span class="pill ${({ Advance: 'green', Hold: 'amber', Decline: 'grey' })[f.decision]}">${f.decision === 'Decline' ? 'Pass' : esc(f.decision)}</span>` : ''}</td><td>${esc(f.comment || '')}</td></tr>`).join('')}
+  </tbody></table></div>`;
+}
+
+/* ---- People ---- */
+function tabPeople() {
+  return `<div class="section card"><h2>Give someone access</h2>
+    <div class="note"><b>Step 1.</b> In Supabase go to Authentication → Users → Add user → <b>Send invitation</b> and enter their email.<br>
+    <b>Step 2.</b> Link that email to ${esc(S.client.name)} below. They’ll get the invite, set a password and land straight in this portal.</div>
+    <div class="form-row">
+      <label class="field"><span>Email</span><input id="np_email" type="email"></label>
+      <label class="field"><span>Full name</span><input id="np_name"></label>
+      <label class="field"><span>Job title</span><input id="np_title"></label>
+    </div>
+    <button class="btn btn-sm btn-primary" id="np_go">Link to ${esc(S.client.name)}</button></div>
+  ${S.members.length ? `<div class="card"><table class="table"><thead><tr><th>Name</th><th>Email</th><th>Title</th><th>Last sign-in</th><th></th></tr></thead><tbody>
+    ${S.members.map((m) => `<tr><td><b>${esc(m.full_name || '')}</b></td><td>${esc(m.email)}</td><td>${esc(m.job_title || '')}</td><td class="meta">${m.last_sign_in_at ? ago(m.last_sign_in_at) : 'Not yet'}</td>
+      <td><button class="btn-link" data-unlink="${m.user_id}" style="color:var(--red)">Remove access</button></td></tr>`).join('')}
+  </tbody></table></div>` : '<div class="empty">No client logins yet.</div>'}`;
+}
+
+/* ---- Settings ---- */
+function tabSettings() {
+  const c = S.client;
+  return `<div class="card"><h2 style="margin-top:0">Branding &amp; details</h2>
+    <div class="form-row">
+      <label class="field"><span>Client name</span><input id="cs_name" value="${esc(c.name)}"></label>
+      <label class="field"><span>URL slug</span><input id="cs_slug" value="${esc(c.slug)}"></label>
+      <label class="field"><span>Logo URL</span><input id="cs_logo" value="${esc(c.logo_url || '')}" placeholder="https://…/logo.png"></label>
+      <label class="field"><span>Primary colour</span><input id="cs_p" type="color" value="${esc(c.primary_color || '#1A5CE8')}" style="height:44px;padding:4px"></label>
+      <label class="field"><span>Accent colour</span><input id="cs_a" type="color" value="${esc(c.accent_color || '#E8572A')}" style="height:44px;padding:4px"></label>
+    </div>
+    <label class="field"><span>Welcome message</span><textarea id="cs_wel" rows="2">${esc(c.welcome_message || '')}</textarea></label>
+    <div class="form-row">
+      <label class="field"><span>Talento contact name</span><input id="cs_cn" value="${esc(c.talento_contact_name || '')}"></label>
+      <label class="field"><span>Talento contact email</span><input id="cs_ce" value="${esc(c.talento_contact_email || '')}"></label>
+      <label class="field"><span>Status</span><select id="cs_act"><option value="1" ${c.active ? 'selected' : ''}>Active</option><option value="0" ${c.active ? '' : 'selected'}>Inactive (hidden)</option></select></label>
+    </div>
+    <button class="btn btn-sm btn-primary" id="cs_go">Save branding</button></div>`;
+}
+
+/* ---- Actions ---- */
+async function upload(file, folder) {
+  const path = `${S.client.id}/${folder}/${Date.now()}-${safeName(file.name)}`;
+  const { error } = await sb.storage.from(cfg.bucket).upload(path, file, { upsert: false, contentType: file.type || undefined });
+  if (error) { toast('Upload failed: ' + error.message); return null; }
+  return path;
+}
+const done = (error, msg) => { if (error) { toast('Error: ' + error.message); return false; } toast(msg); return true; };
+
+function wire() {
+  const on = (id, fn) => { const el = document.getElementById(id); if (el) el.onclick = fn; };
+  on('out', async () => { await sb.auth.signOut(); location.href = './'; });
+  document.querySelectorAll('[data-client]').forEach((b) => (b.onclick = () => loadClient(S.clients.find((c) => c.id === b.dataset.client))));
+  document.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => { S.tab = b.dataset.tab; render(); }));
+  document.querySelectorAll('[data-file]').forEach((b) => (b.onclick = () => openFile(b.dataset.file)));
+
+  on('nc_go', async () => {
+    const name = val('nc_name'); if (!name) return toast('Add a name');
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const { error } = await sb.from('clients').insert({ name, slug, welcome_message: 'Welcome to your Talento search portal. Live status on every search, your shortlist and all documents in one place.' });
+    if (done(error, name + ' added')) { S.tab = 'settings'; loadClients(slug); }
+  });
+
+  on('ns_go', async () => {
+    const title = val('ns_title'); if (!title) return toast('Add a role title');
+    const { error } = await sb.from('searches').insert({ client_id: S.client.id, title, location: val('ns_loc'), compensation: val('ns_comp'), stage: val('ns_stage'), summary: val('ns_sum'), sort_order: S.searches.length });
+    if (done(error, 'Search added')) loadClient(S.client);
+  });
+
+  on('nca_go', async (e) => {
+    const full_name = val('nca_name'); if (!full_name) return toast('Add a name');
+    e.target.disabled = true;
+    const f = document.getElementById('nca_file').files[0];
+    const iqs_report_path = f ? await upload(f, 'iqs') : null;
+    const { error } = await sb.from('candidates').insert({ search_id: val('nca_search'), client_id: S.client.id, full_name, current_title: val('nca_title'), current_company: val('nca_co'), location: val('nca_loc'), linkedin_url: val('nca_li'), summary: val('nca_sum'), iqs_report_path });
+    e.target.disabled = false;
+    if (done(error, 'Candidate presented')) loadClient(S.client);
+  });
+
+  document.querySelectorAll('[data-iqs]').forEach((inp) => (inp.onchange = async () => {
+    const f = inp.files[0]; if (!f) return;
+    const path = await upload(f, 'iqs'); if (!path) return;
+    const { error } = await sb.from('candidates').update({ iqs_report_path: path }).eq('id', inp.dataset.iqs);
+    if (done(error, 'IQS™ report attached')) loadClient(S.client);
+  }));
+
+  on('nd_go', async (e) => {
+    const f = document.getElementById('nd_file').files[0]; if (!f) return toast('Choose a file');
+    e.target.disabled = true;
+    const path = await upload(f, 'docs');
+    if (!path) { e.target.disabled = false; return; }
+    const { error } = await sb.from('documents').insert({ client_id: S.client.id, search_id: val('nd_search'), title: val('nd_title') || f.name, category: val('nd_cat'), storage_path: path });
+    if (done(error, 'Document shared')) loadClient(S.client);
+  });
+
+  document.querySelectorAll('[data-save]').forEach((b) => (b.onclick = async () => {
+    const row = b.closest('[data-row]'); const patch = {};
+    row.querySelectorAll('[data-f]').forEach((el) => { patch[el.dataset.f] = el.type === 'checkbox' ? el.checked : (el.value.trim() || null); });
+    const { error } = await sb.from(b.dataset.save).update(patch).eq('id', row.dataset.row);
+    if (done(error, 'Saved')) loadClient(S.client);
+  }));
+
+  document.querySelectorAll('[data-del]').forEach((b) => (b.onclick = async () => {
+    if (!confirm('Delete this permanently?')) return;
+    const { error } = await sb.from(b.dataset.del).delete().eq('id', b.closest('[data-row]').dataset.row);
+    if (done(error, 'Deleted')) loadClient(S.client);
+  }));
+
+  on('np_go', async () => {
+    const email = val('np_email'); if (!email) return toast('Add an email');
+    const { data, error } = await sb.rpc('admin_add_member', { p_email: email, p_client_id: S.client.id, p_full_name: val('np_name'), p_job_title: val('np_title') });
+    if (error) return toast('Error: ' + error.message);
+    if (data === 'NO_USER') return toast('Invite that email in Supabase first (step 1)');
+    toast('Access granted'); loadClient(S.client);
+  });
+
+  document.querySelectorAll('[data-unlink]').forEach((b) => (b.onclick = async () => {
+    if (!confirm('Remove this person’s access to ' + S.client.name + '?')) return;
+    const { error } = await sb.from('client_members').delete().eq('client_id', S.client.id).eq('user_id', b.dataset.unlink);
+    if (done(error, 'Access removed')) loadClient(S.client);
+  }));
+
+  on('cs_go', async () => {
+    const patch = { name: val('cs_name'), slug: val('cs_slug'), logo_url: val('cs_logo'), primary_color: val('cs_p'), accent_color: val('cs_a'), welcome_message: val('cs_wel'), talento_contact_name: val('cs_cn'), talento_contact_email: val('cs_ce'), active: val('cs_act') === '1' };
+    const { error } = await sb.from('clients').update(patch).eq('id', S.client.id);
+    if (done(error, 'Branding saved')) loadClients(patch.slug);
+  });
+}
+
+boot();
+</script>
+</body>
+</html>

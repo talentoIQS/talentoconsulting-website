@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Client Portal | Talento Consulting</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="portal.css">
+<!-- Talento Client Portal - v1 (102626) -->
+</head>
+<body>
+<div id="app"><div class="loading">Loading your portal…</div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script src="common.js"></script>
+<script>
+const { sb, esc, fmtDate, ago, initials, BRAND, STAGES, stagePill, statusPill, toast, openFile, applyClientTheme } = TP;
+const app = document.getElementById('app');
+let state = { user: null, isAdmin: false, clients: [], client: null, member: null, searches: [], candidates: [], docs: [], feedback: [], tab: 'overview', filter: 'all', drafts: {} };
+let needPassword = TP.linkType === 'invite' || TP.linkType === 'recovery';
+
+/* ---------------- Auth views ---------------- */
+function authShell(inner) {
+  return `<div class="auth-wrap">
+    <aside class="auth-side">
+      <a class="brand" href="/">${BRAND}</a>
+      <div>
+        <h1>Your search,<br><em>in real time.</em></h1>
+        <p>Live status on every role, your candidate shortlist, IQS™ reports and documents, all in one place.</p>
+      </div>
+      <p style="font-size:13px">Need access? Email <a href="mailto:mw@talentoconsulting.ai" style="color:#fff">mw@talentoconsulting.ai</a></p>
+    </aside>
+    <main class="auth-main"><div class="auth-card">${inner}</div></main>
+  </div>`;
+}
+
+function showLogin(msg, kind = 'err') {
+  app.innerHTML = authShell(`
+    <h2>Client sign in</h2>
+    <p class="sub">Welcome back. Sign in to see your searches.</p>
+    ${msg ? `<div class="msg ${kind}">${esc(msg)}</div>` : ''}
+    <form id="f">
+      <label class="field"><span>Work email</span><input type="email" id="email" autocomplete="email" required></label>
+      <label class="field"><span>Password</span><input type="password" id="pw" autocomplete="current-password" required></label>
+      <button class="btn btn-primary" style="width:100%" id="go">Sign in</button>
+      <div class="row"><button type="button" class="btn-link" id="forgot">Forgot password?</button><a class="meta" href="/">Back to site</a></div>
+    </form>`);
+  document.getElementById('f').onsubmit = async (e) => {
+    e.preventDefault();
+    const b = document.getElementById('go'); b.disabled = true; b.textContent = 'Signing in…';
+    const { error } = await sb.auth.signInWithPassword({ email: email.value.trim(), password: pw.value });
+    if (error) return showLogin(error.message === 'Invalid login credentials' ? 'That email and password don’t match. Try again or reset your password.' : error.message);
+    boot();
+  };
+  document.getElementById('forgot').onclick = showForgot;
+}
+
+function showForgot(msg, kind = 'err') {
+  app.innerHTML = authShell(`
+    <h2>Reset your password</h2>
+    <p class="sub">We’ll email you a secure link to set a new one.</p>
+    ${typeof msg === 'string' ? `<div class="msg ${kind}">${esc(msg)}</div>` : ''}
+    <form id="f">
+      <label class="field"><span>Work email</span><input type="email" id="email" required></label>
+      <button class="btn btn-primary" style="width:100%" id="go">Send reset link</button>
+      <div class="row"><button type="button" class="btn-link" id="back">Back to sign in</button></div>
+    </form>`);
+  document.getElementById('back').onclick = () => showLogin();
+  document.getElementById('f').onsubmit = async (e) => {
+    e.preventDefault();
+    document.getElementById('go').disabled = true;
+    const { error } = await sb.auth.resetPasswordForEmail(email.value.trim(), { redirectTo: location.origin + location.pathname });
+    if (error) return showForgot(error.message);
+    showForgot('Check your inbox for the reset link.', 'ok');
+  };
+}
+
+function showSetPassword(msg) {
+  const invite = TP.linkType === 'invite';
+  app.innerHTML = authShell(`
+    <h2>${invite ? 'Welcome aboard' : 'Choose a new password'}</h2>
+    <p class="sub">${invite ? 'Set a password to activate your Talento client portal.' : 'Pick something you’ll remember.'}</p>
+    ${msg ? `<div class="msg err">${esc(msg)}</div>` : ''}
+    <form id="f">
+      <label class="field"><span>New password</span><input type="password" id="pw" minlength="8" autocomplete="new-password" required></label>
+      <label class="field"><span>Confirm password</span><input type="password" id="pw2" minlength="8" autocomplete="new-password" required></label>
+      <button class="btn btn-primary" style="width:100%" id="go">${invite ? 'Activate my portal' : 'Save password'}</button>
+    </form>`);
+  document.getElementById('f').onsubmit = async (e) => {
+    e.preventDefault();
+    if (pw.value !== pw2.value) return showSetPassword('Passwords don’t match.');
+    if (pw.value.length < 8) return showSetPassword('Use at least 8 characters.');
+    document.getElementById('go').disabled = true;
+    const { error } = await sb.auth.updateUser({ password: pw.value });
+    if (error) return showSetPassword(error.message);
+    needPassword = false;
+    history.replaceState(null, '', location.pathname + location.search);
+    toast('Password saved');
+    boot();
+  };
+}
+
+/* ---------------- Data ---------------- */
+async function loadClient(client) {
+  state.client = client;
+  applyClientTheme(client);
+  const id = client.id;
+  const [s, c, d, f, m] = await Promise.all([
+    sb.from('searches').select('*').eq('client_id', id).order('sort_order').order('created_at'),
+    sb.from('candidates').select('*').eq('client_id', id).order('sort_order').order('presented_on', { ascending: false }),
+    sb.from('documents').select('*').eq('client_id', id).order('created_at', { ascending: false }),
+    sb.from('feedback_view').select('*').eq('client_id', id).order('created_at', { ascending: false }),
+    sb.from('client_members').select('*').eq('client_id', id).eq('user_id', state.user.id).maybeSingle()
+  ]);
+  state.searches = s.data || []; state.candidates = c.data || []; state.docs = d.data || []; state.feedback = f.data || []; state.member = m.data;
+  render();
+}
+
+async function boot() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (TP.linkError) return showLogin(TP.linkError.replace(/\+/g, ' ') + '. Ask Talento for a fresh invite.');
+  if (!session) return showLogin();
+  if (needPassword) return showSetPassword();
+  state.user = session.user;
+  const [{ data: adm }, { data: clients }] = await Promise.all([
+    sb.rpc('is_admin'),
+    sb.from('clients').select('*').eq('active', true).order('name')
+  ]);
+  state.isAdmin = !!adm;
+  state.clients = clients || [];
+  if (!state.clients.length) {
+    app.innerHTML = authShell(`<h2>Almost there</h2><p class="sub">Your login works, but it isn’t linked to a client portal yet. Talento will finish setting you up shortly.</p><button class="btn btn-ghost" id="out">Sign out</button>`);
+    document.getElementById('out').onclick = signOut;
+    return;
+  }
+  const want = new URLSearchParams(location.search).get('client');
+  const pick = state.clients.find((c) => c.slug === want) || state.clients[0];
+  loadClient(pick);
+}
+
+async function signOut() { await sb.auth.signOut(); location.href = location.pathname; }
+
+/* ---------------- Render ---------------- */
+function render() {
+  const { client, searches, candidates, docs } = state;
+  const active = searches.filter((s) => !['Placed', 'Closed'].includes(s.stage));
+  const inPlay = candidates.filter((c) => !['Declined', 'Withdrawn'].includes(c.status));
+  const placed = searches.filter((s) => s.stage === 'Placed').length + candidates.filter((c) => c.status === 'Hired').length;
+  const awaiting = candidates.filter((c) => c.status === 'Presented' && !state.feedback.some((f) => f.candidate_id === c.id)).length;
+  const name = state.member?.full_name?.split(' ')[0];
+
+  app.innerHTML = `
+  <header class="topbar"><div class="topbar-in">
+    <a class="brand" href="/">${BRAND}</a>
+    <span class="x">×</span>
+    <div class="client-chip">${client.logo_url ? `<img src="${esc(client.logo_url)}" alt="${esc(client.name)}">` : esc(client.name)}</div>
+    <div class="spacer"></div>
+    ${state.clients.length > 1 ? `<select id="clientSel" class="btn btn-sm btn-ghost" style="padding-right:10px">${state.clients.map((c) => `<option value="${c.slug}" ${c.id === client.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>` : ''}
+    ${state.isAdmin ? `<a class="btn btn-sm btn-ghost" href="admin.html?client=${esc(client.slug)}">Admin</a>` : ''}
+    <div class="who"><b>${esc(state.member?.full_name || state.user.email)}</b>${state.isAdmin ? 'Talento admin' : esc(state.member?.job_title || '')}</div>
+    <button class="btn btn-sm btn-primary" id="out">Sign out</button>
+  </div></header>
+
+  <main class="wrap">
+    <section class="hero">
+      <div>
+        <div class="eyebrow">${esc(client.name)} × Talento</div>
+        <h1>${name ? `Hi ${esc(name)}, here’s where things stand.` : 'Here’s where things stand.'}</h1>
+        <p>${esc(client.welcome_message || 'Live status on every search, your shortlist and all documents in one place.')}</p>
+      </div>
+    </section>
+
+    <section class="stats">
+      <div class="stat"><div class="n">${active.length}</div><div class="l">Active searches</div></div>
+      <div class="stat"><div class="n">${inPlay.length}</div><div class="l">Candidates in play</div></div>
+      <div class="stat"><div class="n">${awaiting}</div><div class="l">Awaiting your feedback</div></div>
+      <div class="stat"><div class="n">${placed}</div><div class="l">Hires made</div></div>
+    </section>
+
+    <nav class="tabs">
+      ${tabBtn('overview', 'Searches', searches.length)}
+      ${tabBtn('shortlist', 'Shortlist', inPlay.length)}
+      ${tabBtn('documents', 'Documents', docs.length)}
+    </nav>
+    <div id="body">${state.tab === 'overview' ? viewSearches() : state.tab === 'shortlist' ? viewShortlist() : viewDocs()}</div>
+
+    <section class="contact">
+      <div><b>${esc(client.talento_contact_name || 'Martin Wickes')}</b><p>Your Talento partner. Questions on any search, just reach out.</p></div>
+      <a class="btn" href="mailto:${esc(client.talento_contact_email || 'mw@talentoconsulting.ai')}">Email ${esc((client.talento_contact_name || 'Martin').split(' ')[0])}</a>
+    </section>
+  </main>`;
+
+  document.getElementById('out').onclick = signOut;
+  document.querySelectorAll('.tab').forEach((t) => (t.onclick = () => { state.tab = t.dataset.tab; render(); }));
+  const cs = document.getElementById('clientSel');
+  if (cs) cs.onchange = () => { const c = state.clients.find((x) => x.slug === cs.value); history.replaceState(null, '', '?client=' + c.slug); state.tab = 'overview'; state.filter = 'all'; loadClient(c); };
+  wireBody();
+}
+
+const tabBtn = (id, label, n) => `<button class="tab ${state.tab === id ? 'on' : ''}" data-tab="${id}">${label}<span class="count">${n}</span></button>`;
+
+function viewSearches() {
+  if (!state.searches.length) return `<div class="empty">Your searches will appear here as soon as we kick off.</div>`;
+  return `<div class="grid2">${state.searches.map((s) => {
+    const idx = STAGES.indexOf(s.stage);
+    const n = state.candidates.filter((c) => c.search_id === s.id && !['Declined', 'Withdrawn'].includes(c.status)).length;
+    return `<article class="card">
+      <div class="card-head"><div><h3>${esc(s.title)}</h3><div class="meta">${[s.location, s.compensation].filter(Boolean).map(esc).join(' · ')}</div></div>${stagePill(s.stage)}</div>
+      ${s.summary ? `<p style="margin:0;font-size:14px">${esc(s.summary)}</p>` : ''}
+      ${idx >= 0 ? `<div class="pipeline">${STAGES.map((_, i) => `<div class="${i < idx ? 'done' : i === idx ? 'now' : ''}"></div>`).join('')}</div>
+      <div class="pipe-labels">${STAGES.map((x) => `<span>${x}</span>`).join('')}</div>` : ''}
+      ${s.next_steps ? `<div class="next"><b>Next steps</b>${esc(s.next_steps)}</div>` : ''}
+      <div class="card-foot"><span>Updated ${ago(s.updated_at)}</span>${n ? `<button class="btn-link" data-goto="${s.id}">${n} candidate${n > 1 ? 's' : ''} →</button>` : ''}</div>
+    </article>`;
+  }).join('')}</div>`;
+}
+
+function viewShortlist() {
+  const list = state.candidates.filter((c) => state.filter === 'all' || c.search_id === state.filter);
+  const sOpts = state.searches.filter((s) => state.candidates.some((c) => c.search_id === s.id));
+  const head = `<div class="filter"><select id="flt"><option value="all">All searches</option>${sOpts.map((s) => `<option value="${s.id}" ${state.filter === s.id ? 'selected' : ''}>${esc(s.title)}</option>`).join('')}</select></div>`;
+  if (!list.length) return head + `<div class="empty">No candidates presented yet. We’ll notify you when your shortlist lands.</div>`;
+  return head + `<div class="grid2">${list.map(candCard).join('')}</div>`;
+}
+
+function candCard(c) {
+  const s = state.searches.find((x) => x.id === c.search_id);
+  const fb = state.feedback.filter((f) => f.candidate_id === c.id);
+  const d = state.drafts[c.id] || {};
+  return `<article class="card">
+    <div class="cand">
+      <div class="avatar" style="background:var(--client)">${esc(initials(c.full_name))}</div>
+      <div>
+        <div class="card-head" style="margin:0"><div><h3>${esc(c.full_name)}</h3>
+          <div class="meta">${esc([c.current_title, c.current_company].filter(Boolean).join(' at '))}${c.location ? ' · ' + esc(c.location) : ''}</div>
+          <div class="meta">For: ${esc(s?.title || '')} · Presented ${fmtDate(c.presented_on)}</div></div>
+          ${statusPill(c.status)}</div>
+        ${c.summary ? `<p class="summary">${esc(c.summary)}</p>` : ''}
+        <div class="links">
+          ${c.iqs_report_path ? `<button class="btn-link" data-file="${esc(c.iqs_report_path)}">View IQS™ report</button>` : ''}
+          ${c.linkedin_url ? `<a href="${esc(c.linkedin_url)}" target="_blank" rel="noopener">LinkedIn ↗</a>` : ''}
+        </div>
+      </div>
+    </div>
+    <div class="fb" data-cand="${c.id}">
+      <div class="fb-actions">${['Advance', 'Hold', 'Decline'].map((x) => `<button type="button" data-dec="${x}" class="${d.decision === x ? 'sel ' + x : ''}">${x === 'Advance' ? 'Advance' : x === 'Hold' ? 'Hold' : 'Pass'}</button>`).join('')}</div>
+      <textarea placeholder="Share your thoughts with Talento…">${esc(d.comment || '')}</textarea>
+      <div class="fb-send"><button class="btn btn-sm btn-primary" data-send>Send feedback</button></div>
+      ${fb.length ? `<div class="fb-log">${fb.map((f) => `<div class="fb-item"><b>${esc(f.author_name)}</b>${f.decision ? ` · ${f.decision === 'Decline' ? 'Pass' : esc(f.decision)}` : ''} <span class="meta">· ${ago(f.created_at)}</span>${f.comment ? `<div>${esc(f.comment)}</div>` : ''}</div>`).join('')}</div>` : ''}
+    </div>
+  </article>`;
+}
+
+function viewDocs() {
+  if (!state.docs.length) return `<div class="empty">Job specs, proposals and reports will be shared here.</div>`;
+  return `<table class="docs"><thead><tr><th>Document</th><th>Type</th><th>Search</th><th>Added</th><th></th></tr></thead><tbody>
+    ${state.docs.map((d) => `<tr><td><b>${esc(d.title)}</b></td><td><span class="pill">${esc(d.category)}</span></td>
+      <td class="meta">${esc(state.searches.find((s) => s.id === d.search_id)?.title || '')}</td><td class="meta">${fmtDate(d.created_at)}</td>
+      <td style="text-align:right"><button class="btn btn-sm btn-ghost" data-file="${esc(d.storage_path)}">Open</button></td></tr>`).join('')}
+  </tbody></table>`;
+}
+
+function wireBody() {
+  document.querySelectorAll('[data-goto]').forEach((b) => (b.onclick = () => { state.tab = 'shortlist'; state.filter = b.dataset.goto; render(); }));
+  const flt = document.getElementById('flt');
+  if (flt) flt.onchange = () => { state.filter = flt.value; render(); };
+  document.querySelectorAll('[data-file]').forEach((b) => (b.onclick = () => openFile(b.dataset.file)));
+  document.querySelectorAll('.fb').forEach((box) => {
+    const id = box.dataset.cand;
+    const ta = box.querySelector('textarea');
+    ta.oninput = () => { state.drafts[id] = { ...(state.drafts[id] || {}), comment: ta.value }; };
+    box.querySelectorAll('[data-dec]').forEach((b) => (b.onclick = () => {
+      const cur = state.drafts[id]?.decision;
+      state.drafts[id] = { ...(state.drafts[id] || {}), comment: ta.value, decision: cur === b.dataset.dec ? null : b.dataset.dec };
+      box.querySelectorAll('[data-dec]').forEach((x) => (x.className = state.drafts[id].decision === x.dataset.dec ? 'sel ' + x.dataset.dec : ''));
+    }));
+    box.querySelector('[data-send]').onclick = async (e) => {
+      const d = state.drafts[id] || {};
+      if (!d.decision && !(d.comment || '').trim()) return toast('Pick an option or add a comment');
+      e.target.disabled = true;
+      const { error } = await sb.from('feedback').insert({ candidate_id: id, decision: d.decision || null, comment: (d.comment || '').trim() || null });
+      if (error) { e.target.disabled = false; return toast('Could not send: ' + error.message); }
+      delete state.drafts[id];
+      toast('Thanks, feedback sent to Talento');
+      const { data } = await sb.from('feedback_view').select('*').eq('client_id', state.client.id).order('created_at', { ascending: false });
+      state.feedback = data || [];
+      render();
+    };
+  });
+}
+
+sb.auth.onAuthStateChange((event) => { if (event === 'PASSWORD_RECOVERY') { needPassword = true; showSetPassword(); } });
+boot();
+</script>
+</body>
+</html>
