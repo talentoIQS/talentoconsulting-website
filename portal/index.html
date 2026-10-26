@@ -335,7 +335,7 @@ function viewPipeline() {
   if (!all.length) return `<div class="empty">The live pipeline appears here after the next sync from the Talento ATS.</div>`;
   if (state.role !== 'all' && !all.some((r) => r.id === state.role)) state.role = 'all';
   const chips = all.length > 1 ? `<div class="pchips">${[['all', 'All roles', all.length]].concat(all.map((r) => [r.id, r.title, r.ref])).map((x) => `<button class="pchip ${state.role === x[0] ? 'on' : ''}" data-role="${esc(x[0])}">${esc(x[1])}${x[2] ? `<span>${esc(x[2])}</span>` : ''}</button>`).join('')}</div>` : '';
-  return chips + all.filter((r) => state.role === 'all' || r.id === state.role).map(pipeRole).join('');
+  return all.filter((r) => state.role === 'all' || r.id === state.role).map(pipeRole).join('');
 }
 function pipeRole(r) {
   const counts = r.counts || {}, reach = r.reached || {}, lab = Object.fromEntries(PSTAGES);
