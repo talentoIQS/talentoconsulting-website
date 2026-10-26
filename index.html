@@ -1025,6 +1025,7 @@ footer,.footer-btm{padding-bottom:calc(env(safe-area-inset-bottom,0px) + 24px)}
   .ticker-inner{animation:none!important}
   .testi-track{animation:none!important}
 }
+.nav-pill-portal{margin-right:10px;text-decoration:none;display:inline-flex;align-items:center;background:var(--dark);color:#fff!important;border-color:var(--dark)}.nav-pill-portal:hover{background:var(--blue);border-color:var(--blue)}
 </style>
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
@@ -1173,6 +1174,7 @@ async function dataCapture(collection, record){
       </div>
     </li>
   </ul>
+  <a class="nav-pill nav-pill-portal" href="/portal/">Client portal</a>
   <button class="nav-pill" onclick="document.getElementById('contact').scrollIntoView({behavior:'smooth'})">Start a project</button>
   <button class="mob-menu-btn" onclick="document.getElementById('mob-nav').classList.add('open')" aria-label="Menu">
     <span></span><span></span><span></span>
@@ -1188,7 +1190,8 @@ async function dataCapture(collection, record){
   <a href="#iqs" onclick="document.getElementById('mob-nav').classList.remove('open')" style="display:inline-flex;align-items:center;gap:8px">IQS™ <span style="font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;background:#E8572A;color:#fff;padding:3px 9px;border-radius:100px;animation:cs-pulse 2.4s ease-in-out infinite">Soon</span></a>
   <a href="#resources" onclick="document.getElementById('mob-nav').classList.remove('open')">Resources</a>
   <a href="#role-analyser" onclick="document.getElementById('mob-nav').classList.remove('open')">Analyse a Role</a>
-  <a href="#contact" onclick="document.getElementById('mob-nav').classList.remove('open')" style="color:var(--coral)">Start a project</a>
+  <a href="/portal/">Client portal</a>
+    <a href="#contact" onclick="document.getElementById('mob-nav').classList.remove('open')" style="color:var(--coral)">Start a project</a>
 </div>
 
 <!-- HERO -->
