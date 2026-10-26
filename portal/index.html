@@ -7,15 +7,15 @@
 <meta name="robots" content="noindex, nofollow">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="portal.css?v=3-102626">
-<!-- Talento Client Portal - v3 (102626): live updates, stars, notes and two-way messages -->
+<link rel="stylesheet" href="portal.css?v=3.2-102626">
+<!-- Talento Client Portal - v3.2 (102626): ATS-fed, live updates, stars, notes and two-way messages -->
 </head>
 <body>
 <div id="app"><div class="loading">Loading your portal…</div></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js?v=3-102626"></script>
-<script src="common.js?v=3-102626"></script>
+<script src="config.js?v=3.2-102626"></script>
+<script src="common.js?v=3.2-102626"></script>
 <script>
 const { sb, esc, fmtDate, ago, initials, BRAND, STAGES, stagePill, statusPill, toast, openFile, applyClientTheme, live, debounce, isTyping, stamp } = TP;
 const app = document.getElementById('app');
@@ -262,6 +262,7 @@ const PTALLY = { prospect: 1, intro: 1, applied: 1, rejected: 1 };
 const PREJ = { us: 'we passed', client: 'you passed', candidate: 'candidate withdrew', not_now: 'not now' };
 const PLINE = { prospect: 'mapped for this role, not approached yet.', intro: 'approached by email, LinkedIn or phone, no conversation yet.', applied: 'applied through LinkedIn or the advert.', rejected: 'not going ahead.' };
 function sinceTxt(iso) { if (!iso) return ''; const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000); return d <= 0 ? 'moved here today' : d === 1 ? 'here 1 day' : 'here ' + d + ' days'; }
+const hmFor = (r) => r.hiring_manager || (state.searches.find((s) => s.ref && s.ref === r.ref) || {}).hiring_manager || '';
 function viewPipeline() {
   const all = state.pipeline;
   if (!all.length) return `<div class="empty">The live pipeline appears here after the next sync from the Talento ATS.</div>`;
@@ -291,7 +292,7 @@ function pipeRole(r) {
     return `<div class="pcol"><div class="pcol-h"><h4>${l}</h4><span>${counts[k] || 0}</span></div>${body}</div>`;
   }).join('');
   return `<article class="prole">
-    <div class="prole-h"><h3>${esc(r.title || r.id)}</h3>${r.ref ? `<span class="pref">${esc(r.ref)}</span>` : ''}<span class="meta">${[r.location, r.salary].filter(Boolean).map(esc).join(' · ')}</span><span class="meta" style="margin-left:auto">Live from the ATS, ${ago(r.synced)}</span></div>
+    <div class="prole-h"><h3>${esc(r.title || r.id)}</h3>${r.ref ? `<span class="pref">${esc(r.ref)}</span>` : ''}${hmFor(r) ? `<span class="hm">Hiring manager: <b>${esc(hmFor(r))}</b></span>` : ''}<span class="meta">${[r.location, r.salary].filter(Boolean).map(esc).join(' · ')}</span><span class="meta" style="margin-left:auto">Live from the ATS, ${ago(r.synced)}</span></div>
     <div class="pstrip" style="--n:${PSTAGES.length}">${strip}</div>
     <div class="pnote">Big number: there now. Ever here: everyone who has been at that stage, including people who moved on or were rejected later.</div>
     <div class="pboard">${cols}</div>
@@ -306,7 +307,7 @@ function viewSearches() {
     const idx = STAGES.indexOf(s.stage);
     const n = state.candidates.filter((c) => c.search_id === s.id && !['Declined', 'Withdrawn'].includes(c.status)).length;
     return `<article class="card">
-      <div class="card-head"><div><h3>${esc(s.title)}</h3><div class="meta">${[s.location, s.compensation].filter(Boolean).map(esc).join(' · ')}</div></div>${stagePill(s.stage)}</div>
+      <div class="card-head"><div><h3>${esc(s.title)}${s.ref ? ` <span class="pref">${esc(s.ref)}</span>` : ''}</h3>${s.hiring_manager ? `<div class="hm">Hiring manager: <b>${esc(s.hiring_manager)}</b></div>` : ''}<div class="meta">${[s.location, s.compensation].filter(Boolean).map(esc).join(' · ')}</div></div>${stagePill(s.stage)}</div>
       ${s.summary ? `<p style="margin:0;font-size:14px">${esc(s.summary)}</p>` : ''}
       ${idx >= 0 ? `<div class="pipeline">${STAGES.map((_, i) => `<div class="${i < idx ? 'done' : i === idx ? 'now' : ''}"></div>`).join('')}</div>
       <div class="pipe-labels">${STAGES.map((x) => `<span>${x}</span>`).join('')}</div>` : ''}
@@ -319,7 +320,7 @@ function viewSearches() {
 function viewShortlist() {
   const list = state.candidates.filter((c) => state.filter === 'all' || c.search_id === state.filter);
   const sOpts = state.searches.filter((s) => state.candidates.some((c) => c.search_id === s.id));
-  const head = `<div class="filter"><select id="flt"><option value="all">All searches</option>${sOpts.map((s) => `<option value="${s.id}" ${state.filter === s.id ? 'selected' : ''}>${esc(s.title)}</option>`).join('')}</select></div>`;
+  const head = `<div class="filter"><select id="flt"><option value="all">All searches</option>${sOpts.map((s) => `<option value="${s.id}" ${state.filter === s.id ? 'selected' : ''}>${esc(s.title)}${s.ref ? ' · ' + esc(s.ref) : ''}</option>`).join('')}</select></div>`;
   if (!list.length) return head + `<div class="empty">No candidates presented yet. We’ll notify you when your shortlist lands.</div>`;
   return head + `<div class="grid2">${list.map(candCard).join('')}</div>`;
 }
@@ -334,7 +335,7 @@ function candCard(c) {
       <div>
         <div class="card-head" style="margin:0"><div><h3>${esc(c.full_name)}</h3>
           <div class="meta">${esc([c.current_title, c.current_company].filter(Boolean).join(' at '))}${c.location ? ' · ' + esc(c.location) : ''}</div>
-          <div class="meta">For: ${esc(s?.title || '')} · Presented ${fmtDate(c.presented_on)}</div></div>
+          <div class="meta">For: ${esc(s?.title || '')}${s?.ref ? ' (' + esc(s.ref) + ')' : ''} · Presented ${fmtDate(c.presented_on)}</div></div>
           <div class="head-r">${starBtn(c)}${statusPill(c.status)}</div></div>
         ${c.summary ? `<p class="summary">${esc(c.summary)}</p>` : ''}
         <div class="links">

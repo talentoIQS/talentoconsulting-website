@@ -7,15 +7,15 @@
 <meta name="robots" content="noindex, nofollow">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="portal.css?v=3-102626">
+<link rel="stylesheet" href="portal.css?v=3.2-102626">
 <!-- Talento Client Portal Admin - v3 (102626): live inbox, two-way messages, client stars and notes -->
 </head>
 <body>
 <div id="app"><div class="loading">Loading admin…</div></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js?v=3-102626"></script>
-<script src="common.js?v=3-102626"></script>
+<script src="config.js?v=3.2-102626"></script>
+<script src="common.js?v=3.2-102626"></script>
 <script>
 const { sb, cfg, esc, fmtDate, ago, safeName, BRAND, STAGES, stagePill, statusPill, toast, openFile, live, debounce, isTyping, stamp } = TP;
 const app = document.getElementById('app');
@@ -166,6 +166,8 @@ function tabSearches() {
   return `<div class="section card"><h2>Add a search</h2>
     <div class="form-row">
       <label class="field"><span>Role title</span><input id="ns_title" placeholder="VP Sales, North America"></label>
+      <label class="field"><span>Reference</span><input id="ns_ref" placeholder="TAL-ABC-2601"></label>
+      <label class="field"><span>Hiring manager</span><input id="ns_hm" placeholder="Full name"></label>
       <label class="field"><span>Location</span><input id="ns_loc" placeholder="Remote US"></label>
       <label class="field"><span>Compensation</span><input id="ns_comp" placeholder="$250k OTE"></label>
       <label class="field"><span>Stage</span><select id="ns_stage">${opt(STAGE_ALL, 'Kickoff')}</select></label>
@@ -174,7 +176,7 @@ function tabSearches() {
     <button class="btn btn-sm btn-primary" id="ns_go">Add search</button></div>
   ${S.searches.length ? `<div class="card"><table class="table"><thead><tr><th style="width:24%">Role</th><th>Stage</th><th style="width:34%">Next steps (client sees this)</th><th>Location / comp</th><th></th></tr></thead><tbody>
     ${S.searches.map((s) => `<tr data-row="${s.id}">
-      <td><input data-f="title" value="${esc(s.title)}"><textarea data-f="summary" rows="2" placeholder="Summary" style="margin-top:6px">${esc(s.summary || '')}</textarea></td>
+      <td><input data-f="title" value="${esc(s.title)}"><input data-f="ref" value="${esc(s.ref || '')}" placeholder="Reference" style="margin-top:6px"><input data-f="hiring_manager" value="${esc(s.hiring_manager || '')}" placeholder="Hiring manager" style="margin-top:6px"><textarea data-f="summary" rows="2" placeholder="Summary" style="margin-top:6px">${esc(s.summary || '')}</textarea></td>
       <td><select data-f="stage">${opt(STAGE_ALL, s.stage)}</select><div class="meta" style="margin-top:6px">Updated ${ago(s.updated_at)}</div></td>
       <td><textarea data-f="next_steps" rows="3">${esc(s.next_steps || '')}</textarea></td>
       <td><input data-f="location" value="${esc(s.location || '')}" placeholder="Location"><input data-f="compensation" value="${esc(s.compensation || '')}" placeholder="Comp" style="margin-top:6px"></td>
@@ -201,7 +203,7 @@ function tabCands() {
     ${S.candidates.map((c) => `<tr data-row="${c.id}">
       <td><input data-f="full_name" value="${esc(c.full_name)}"><input data-f="current_title" value="${esc(c.current_title || '')}" placeholder="Title" style="margin-top:6px"><input data-f="current_company" value="${esc(c.current_company || '')}" placeholder="Company" style="margin-top:6px">
         <div class="meta" style="margin-top:6px">${esc(S.searches.find((s) => s.id === c.search_id)?.title || '')}${S.marks.some((m) => m.candidate_id === c.id && m.starred) ? ' · <b style="color:#d97706">★ ' + S.marks.filter((m) => m.candidate_id === c.id && m.starred).length + '</b>' : ''} · <button class="btn-link" data-sel="${c.id}">Messages</button></div></td>
-      <td><select data-f="status">${opt(STATUS_ALL, c.status)}</select></td>
+      <td>${c.ats_id ? `${statusPill(c.status)}<div class="meta" style="margin-top:6px">Set by the ATS</div>` : `<select data-f="status">${opt(STATUS_ALL, c.status)}</select>`}</td>
       <td><textarea data-f="summary" rows="4">${esc(c.summary || '')}</textarea><input data-f="linkedin_url" value="${esc(c.linkedin_url || '')}" placeholder="LinkedIn URL" style="margin-top:6px"></td>
       <td>${c.iqs_report_path ? `<button class="btn-link" data-file="${esc(c.iqs_report_path)}">Open</button><br>` : ''}<input type="file" data-iqs="${c.id}" accept=".pdf,.doc,.docx" style="font-size:12px;border:0;padding:4px 0"></td>
       <td><input type="checkbox" data-f="visible_to_client" ${c.visible_to_client ? 'checked' : ''} style="width:auto"></td>
@@ -311,7 +313,7 @@ function wire() {
 
   on('ns_go', async () => {
     const title = val('ns_title'); if (!title) return toast('Add a role title');
-    const { error } = await sb.from('searches').insert({ client_id: S.client.id, title, location: val('ns_loc'), compensation: val('ns_comp'), stage: val('ns_stage'), summary: val('ns_sum'), sort_order: S.searches.length });
+    const { error } = await sb.from('searches').insert({ client_id: S.client.id, title, location: val('ns_loc'), compensation: val('ns_comp'), stage: val('ns_stage'), summary: val('ns_sum'), ref: val('ns_ref'), hiring_manager: val('ns_hm'), sort_order: S.searches.length });
     if (done(error, 'Search added')) loadClient(S.client);
   });
 
