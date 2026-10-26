@@ -7,15 +7,15 @@
 <meta name="robots" content="noindex, nofollow">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="portal.css?v=3.7b-102626">
+<link rel="stylesheet" href="portal.css?v=3.9-102626">
 <!-- Talento Client Portal Admin - v3 (102626): live inbox, two-way messages, client stars and notes -->
 </head>
 <body>
 <div id="app"><div class="loading">Loading admin…</div></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js?v=3.7b-102626"></script>
-<script src="common.js?v=3.7b-102626"></script>
+<script src="config.js?v=3.9-102626"></script>
+<script src="common.js?v=3.9-102626"></script>
 <script>
 const { sb, cfg, esc, fmtDate, ago, safeName, BRAND, STAGES, stagePill, statusPill, toast, openFile, live, debounce, isTyping, stamp } = TP;
 const app = document.getElementById('app');
@@ -286,7 +286,7 @@ function tabPeople() {
       <label class="field"><span>Full name *</span><input id="ct_name" value="${esc(e.full_name || '')}" autocomplete="off"></label>
       <label class="field"><span>Job title *</span><input id="ct_title" value="${esc(e.job_title || '')}" autocomplete="off"></label>
       <label class="field"><span>Email address *</span><input id="ct_email" type="email" value="${esc(e.email || '')}" autocomplete="off"></label>
-      <label class="field"><span>Access *</span><select id="ct_access"><option value="hm" ${acc === 'hm' ? 'selected' : ''}>Hiring manager</option><option value="interviewer" ${acc === 'interviewer' ? 'selected' : ''}>Interviewer</option></select></label>
+      <label class="field"><span>Access *</span><select id="ct_access"><option value="hm" ${acc === 'hm' ? 'selected' : ''}>Hiring manager</option><option value="collaborator" ${acc === 'collaborator' ? 'selected' : ''}>Collaborator (sees what the HM sees)</option><option value="interviewer" ${acc === 'interviewer' ? 'selected' : ''}>Interviewer</option></select></label>
     </div>
     <div class="field"><span>Searches they can see *</span>
       <div class="ckgrid">${S.searches.map((x) => `<label class="ck"><input type="checkbox" data-ct-search="${x.id}" ${sel.has(x.id) ? 'checked' : ''}> ${esc(x.title)} <span class="meta">${esc(x.ref || '')}</span></label>`).join('')}</div></div>
@@ -298,7 +298,7 @@ function tabPeople() {
   <div class="card"><h2 style="margin-top:0">People at ${esc(S.client.name)}</h2>
   ${S.contacts.length ? `<table class="table"><thead><tr><th>Name</th><th>Email</th><th>Access</th><th>Searches</th><th>Portal</th><th></th></tr></thead><tbody>
     ${S.contacts.map((k) => `<tr><td><b>${esc(k.full_name)}</b><div class="meta">${esc(k.job_title)}</div></td><td>${esc(k.email)}</td>
-      <td>${k.access === 'hm' ? 'Hiring manager' : 'Interviewer'}${k.access === 'interviewer' && k.candidate_ids.length ? `<div class="meta">${k.candidate_ids.length} candidate${k.candidate_ids.length === 1 ? '' : 's'}</div>` : ''}</td>
+      <td>${k.access === 'hm' ? 'Hiring manager' : k.access === 'collaborator' ? 'Collaborator' : 'Interviewer'}${k.access === 'interviewer' && k.candidate_ids.length ? `<div class="meta">${k.candidate_ids.length} candidate${k.candidate_ids.length === 1 ? '' : 's'}</div>` : ''}</td>
       <td class="meta">${esc(refs(k.search_ids))}</td><td>${status(k)}</td>
       <td style="white-space:nowrap"><button class="btn-link" data-ct-edit="${k.id}">Edit</button> · ${k.user_id && S.members.some((m) => m.user_id === k.user_id) ? '' : `<button class="btn-link" data-ct-invite="${k.id}">${k.invited_at ? 'Resend invite' : 'Send portal invite'}</button> · `}<button class="btn-link" data-ct-del="${k.id}" style="color:var(--red)">Remove</button></td></tr>`).join('')}
   </tbody></table>
@@ -369,7 +369,7 @@ function wire() {
     if (!v.full_name || !v.job_title || !v.email || !v.access) return toast('Full name, job title, email and access are all required');
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v.email)) return toast('That email address does not look right');
     if (!v.search_ids.length) return toast('Tick at least one search');
-    if (v.access === 'hm') v.candidate_ids = [];
+    if (v.access !== 'interviewer') v.candidate_ids = [];
     ev.target.disabled = true;
     const id = S.editContact && S.editContact.id;
     const { error } = id ? await sb.from('client_contacts').update({ ...v, updated_at: new Date().toISOString() }).eq('id', id)
