@@ -1,4 +1,4 @@
-// Talento Client Portal - v1 (102626) - shared helpers
+// Talento Client Portal - v3 (102626) - shared helpers
 (function () {
   const cfg = window.TALENTO_PORTAL;
 
@@ -67,5 +67,30 @@
     r.setProperty('--client-accent', client?.accent_color || '#E8572A');
   }
 
-  window.TP = { sb, cfg, esc, fmtDate, ago, initials, safeName, BRAND, STAGES, stagePill, statusPill, toast, signedUrl, openFile, applyClientTheme, linkType, linkError };
+  // Live updates: listen for any change on the portal tables (row security still applies).
+  // onChange(table, payload) fires per change; onStatus(true/false) reports the connection.
+  const LIVE_TABLES = ['searches', 'candidates', 'feedback', 'documents', 'activity', 'candidate_messages', 'candidate_marks', 'ats_pipeline'];
+  let liveChannel = null;
+  function live(clientId, onChange, onStatus) {
+    if (liveChannel) { sb.removeChannel(liveChannel); liveChannel = null; }
+    let ch = sb.channel('portal-live-' + (clientId || 'all') + '-' + Date.now());
+    LIVE_TABLES.forEach((table) => {
+      const opts = { event: '*', schema: 'public', table };
+      if (clientId) opts.filter = 'client_id=eq.' + clientId;
+      ch = ch.on('postgres_changes', opts, (payload) => onChange(table, payload));
+    });
+    ch.subscribe((status) => onStatus && onStatus(status === 'SUBSCRIBED'));
+    liveChannel = ch;
+    return ch;
+  }
+  // Re-run fn at most once per `ms`, after changes settle.
+  function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
+  // True while the person is typing in a field that holds text, so a live refresh doesn't wipe it.
+  function isTyping() {
+    const a = document.activeElement;
+    return !!a && (a.tagName === 'TEXTAREA' || (a.tagName === 'INPUT' && !['checkbox', 'radio', 'button', 'file', 'color'].includes(a.type))) && !!a.value;
+  }
+  const stamp = (d) => d ? new Date(d).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+
+  window.TP = { sb, cfg, esc, fmtDate, ago, initials, safeName, BRAND, STAGES, stagePill, statusPill, toast, signedUrl, openFile, applyClientTheme, linkType, linkError, live, debounce, isTyping, stamp };
 })();

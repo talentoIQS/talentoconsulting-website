@@ -7,19 +7,22 @@
 <meta name="robots" content="noindex, nofollow">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="portal.css">
-<!-- Talento Client Portal - v1 (102626) -->
+<link rel="stylesheet" href="portal.css?v=3-102626">
+<!-- Talento Client Portal - v3 (102626): live updates, stars, notes and two-way messages -->
 </head>
 <body>
 <div id="app"><div class="loading">Loading your portal…</div></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js"></script>
-<script src="common.js"></script>
+<script src="config.js?v=3-102626"></script>
+<script src="common.js?v=3-102626"></script>
 <script>
-const { sb, esc, fmtDate, ago, initials, BRAND, STAGES, stagePill, statusPill, toast, openFile, applyClientTheme } = TP;
+const { sb, esc, fmtDate, ago, initials, BRAND, STAGES, stagePill, statusPill, toast, openFile, applyClientTheme, live, debounce, isTyping, stamp } = TP;
 const app = document.getElementById('app');
-let state = { user: null, isAdmin: false, clients: [], client: null, member: null, searches: [], candidates: [], docs: [], feedback: [], tab: 'overview', filter: 'all', drafts: {} };
+let state = { user: null, isAdmin: false, clients: [], client: null, member: null, searches: [], candidates: [], docs: [], feedback: [], pipeline: [], messages: [], marks: [], activity: [], role: 'all', tab: 'pipeline', filter: 'all', drafts: {}, msgDrafts: {}, noteDrafts: {}, open: {}, live: false, pending: false };
+const SEEN_KEY = 'talento.portal.seen';
+let seen = {}; try { seen = JSON.parse(localStorage.getItem(SEEN_KEY) || '{}'); } catch (e) {}
+const saveSeen = () => { try { localStorage.setItem(SEEN_KEY, JSON.stringify(seen)); } catch (e) {} };
 let needPassword = TP.linkType === 'invite' || TP.linkType === 'recovery';
 
 /* ---------------- Auth views ---------------- */
@@ -104,19 +107,52 @@ function showSetPassword(msg) {
 }
 
 /* ---------------- Data ---------------- */
-async function loadClient(client) {
-  state.client = client;
-  applyClientTheme(client);
-  const id = client.id;
-  const [s, c, d, f, m] = await Promise.all([
+async function fetchClient(id) {
+  const [s, c, d, f, m, p, msg, mk, act] = await Promise.all([
     sb.from('searches').select('*').eq('client_id', id).order('sort_order').order('created_at'),
     sb.from('candidates').select('*').eq('client_id', id).order('sort_order').order('presented_on', { ascending: false }),
     sb.from('documents').select('*').eq('client_id', id).order('created_at', { ascending: false }),
     sb.from('feedback_view').select('*').eq('client_id', id).order('created_at', { ascending: false }),
-    sb.from('client_members').select('*').eq('client_id', id).eq('user_id', state.user.id).maybeSingle()
+    sb.from('client_members').select('*').eq('client_id', id).eq('user_id', state.user.id).maybeSingle(),
+    sb.from('ats_pipeline').select('job_id,doc,sort,updated_at').eq('client_id', id).order('sort'),
+    sb.from('candidate_messages').select('*').eq('client_id', id).order('created_at'),
+    sb.from('candidate_marks').select('*').eq('client_id', id),
+    sb.from('activity').select('*').eq('client_id', id).order('created_at', { ascending: false }).limit(60)
   ]);
+  state.pipeline = (p.data || []).map((x) => Object.assign({ id: x.job_id, synced: x.updated_at }, x.doc || {}));
   state.searches = s.data || []; state.candidates = c.data || []; state.docs = d.data || []; state.feedback = f.data || []; state.member = m.data;
+  state.messages = msg.data || []; state.marks = mk.data || []; state.activity = act.data || [];
+}
+
+async function loadClient(client) {
+  state.client = client;
+  applyClientTheme(client);
+  await fetchClient(client.id);
   render();
+  goLive();
+}
+
+/* ---------------- Live: anything Talento changes shows up here within a second or two ---------------- */
+const refresh = debounce(async () => {
+  if (!state.client) return;
+  await fetchClient(state.client.id);
+  safeRender();
+}, 400);
+function safeRender() {
+  if (isTyping()) { state.pending = true; return; }
+  state.pending = false;
+  const y = window.scrollY; render(); window.scrollTo(0, y);
+}
+document.addEventListener('focusout', () => setTimeout(() => { if (state.pending && !isTyping()) safeRender(); }, 150));
+function goLive() {
+  live(state.client.id, (table, payload) => {
+    const row = payload.new || {};
+    if (table === 'candidate_messages' && payload.eventType === 'INSERT' && row.from_talento) {
+      const c = state.candidates.find((x) => x.id === row.candidate_id);
+      toast((row.author_name || 'Talento') + ' replied' + (c ? ' on ' + c.full_name : ''));
+    }
+    refresh();
+  }, (on) => { state.live = on; const d = document.getElementById('liveDot'); if (d) d.className = 'live' + (on ? ' on' : ''); });
 }
 
 async function boot() {
@@ -151,6 +187,11 @@ function render() {
   const placed = searches.filter((s) => s.stage === 'Placed').length + candidates.filter((c) => c.status === 'Hired').length;
   const awaiting = candidates.filter((c) => c.status === 'Presented' && !state.feedback.some((f) => f.candidate_id === c.id)).length;
   const name = state.member?.full_name?.split(' ')[0];
+  const pl = state.pipeline || [];
+  const sum = (keys) => pl.reduce((t, r) => t + keys.reduce((u, k) => u + ((r.counts || {})[k] || 0), 0), 0);
+  const tiles = pl.length
+    ? [[pl.length, 'Live searches'], [sum(['screening', 'hm_review', 'hm_interview', 'stage2', 'onsite', 'final', 'offer']), 'Candidates in process'], [sum(['hm_interview', 'stage2', 'onsite', 'final']), 'Interviewing with you'], [sum(['placed']), 'Hires made']]
+    : [[active.length, 'Active searches'], [inPlay.length, 'Candidates in play'], [awaiting, 'Awaiting your feedback'], [placed, 'Hires made']];
 
   app.innerHTML = `
   <header class="topbar"><div class="topbar-in">
@@ -158,6 +199,7 @@ function render() {
     <span class="x">×</span>
     <div class="client-chip">${client.logo_url ? `<img src="${esc(client.logo_url)}" alt="${esc(client.name)}">` : esc(client.name)}</div>
     <div class="spacer"></div>
+    <span id="liveDot" class="live${state.live ? ' on' : ''}" title="Updates arrive automatically"><i></i>Live</span>
     ${state.clients.length > 1 ? `<select id="clientSel" class="btn btn-sm btn-ghost" style="padding-right:10px">${state.clients.map((c) => `<option value="${c.slug}" ${c.id === client.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>` : ''}
     ${state.isAdmin ? `<a class="btn btn-sm btn-ghost" href="admin.html?client=${esc(client.slug)}">Admin</a>` : ''}
     <div class="who"><b>${esc(state.member?.full_name || state.user.email)}</b>${state.isAdmin ? 'Talento admin' : esc(state.member?.job_title || '')}</div>
@@ -173,31 +215,87 @@ function render() {
       </div>
     </section>
 
-    <section class="stats">
-      <div class="stat"><div class="n">${active.length}</div><div class="l">Active searches</div></div>
-      <div class="stat"><div class="n">${inPlay.length}</div><div class="l">Candidates in play</div></div>
-      <div class="stat"><div class="n">${awaiting}</div><div class="l">Awaiting your feedback</div></div>
-      <div class="stat"><div class="n">${placed}</div><div class="l">Hires made</div></div>
-    </section>
+    <section class="stats">${tiles.map((t) => `<div class="stat"><div class="n">${t[0]}</div><div class="l">${t[1]}</div></div>`).join('')}</section>
 
     <nav class="tabs">
+      ${tabBtn('pipeline', 'Live pipeline', state.pipeline.length)}
       ${tabBtn('overview', 'Searches', searches.length)}
       ${tabBtn('shortlist', 'Shortlist', inPlay.length)}
       ${tabBtn('documents', 'Documents', docs.length)}
+      ${tabBtn('updates', 'Updates', unreadTotal() || state.activity.length)}
     </nav>
-    <div id="body">${state.tab === 'overview' ? viewSearches() : state.tab === 'shortlist' ? viewShortlist() : viewDocs()}</div>
+    <div id="body">${state.tab === 'pipeline' ? viewPipeline() : state.tab === 'overview' ? viewSearches() : state.tab === 'shortlist' ? viewShortlist() : state.tab === 'updates' ? viewUpdates() : viewDocs()}</div>
 
     <section class="contact">
       <div><b>${esc(client.talento_contact_name || 'Martin Wickes')}</b><p>Your Talento partner. Questions on any search, just reach out.</p></div>
-      <a class="btn" href="mailto:${esc(client.talento_contact_email || 'mw@talentoconsulting.ai')}">Email ${esc((client.talento_contact_name || 'Martin').split(' ')[0])}</a>
+      <div class="mailbox">
+        <button type="button" class="btn" id="mailBtn" aria-expanded="false">Email ${esc((client.talento_contact_name || 'Martin').split(' ')[0])}</button>
+        <div class="mailmenu hidden" id="mailMenu">
+          <a target="_blank" rel="noopener" href="https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(client.talento_contact_email || 'mw@talentoconsulting.ai')}&su=${encodeURIComponent(client.name + ' search')}">Write in Gmail</a>
+          <a target="_blank" rel="noopener" href="https://outlook.office.com/mail/deeplink/compose?to=${encodeURIComponent(client.talento_contact_email || 'mw@talentoconsulting.ai')}&subject=${encodeURIComponent(client.name + ' search')}">Write in Outlook</a>
+          <a href="mailto:${esc(client.talento_contact_email || 'mw@talentoconsulting.ai')}">Open my email app</a>
+          <button type="button" id="mailCopy">Copy ${esc(client.talento_contact_email || 'mw@talentoconsulting.ai')}</button>
+        </div>
+      </div>
     </section>
   </main>`;
 
   document.getElementById('out').onclick = signOut;
+  const mb = document.getElementById('mailBtn'), mm = document.getElementById('mailMenu');
+  mb.onclick = (e) => { e.stopPropagation(); mm.classList.toggle('hidden'); mb.setAttribute('aria-expanded', String(!mm.classList.contains('hidden'))); };
+  document.addEventListener('click', (e) => { if (!e.target.closest('.mailbox')) mm.classList.add('hidden'); });
+  document.getElementById('mailCopy').onclick = async () => {
+    const addr = client.talento_contact_email || 'mw@talentoconsulting.ai';
+    try { await navigator.clipboard.writeText(addr); toast('Email address copied'); } catch (e) { toast(addr); }
+    mm.classList.add('hidden');
+  };
   document.querySelectorAll('.tab').forEach((t) => (t.onclick = () => { state.tab = t.dataset.tab; render(); }));
   const cs = document.getElementById('clientSel');
   if (cs) cs.onchange = () => { const c = state.clients.find((x) => x.slug === cs.value); history.replaceState(null, '', '?client=' + c.slug); state.tab = 'overview'; state.filter = 'all'; loadClient(c); };
   wireBody();
+}
+
+
+/* ---------------- Live pipeline, straight from the Talento ATS ---------------- */
+const PSTAGES = [['prospect','Prospects'],['intro','Intro sent'],['applied','LI applications'],['screening','Screening'],['hm_review','HM review / submitted'],['hm_interview','HM interview'],['stage2','Stage 2'],['onsite','Assessment / onsite'],['final','Final stage'],['offer','Offer'],['placed','Placed'],['rejected','Rejected']];
+const PTALLY = { prospect: 1, intro: 1, applied: 1, rejected: 1 };
+const PREJ = { us: 'we passed', client: 'you passed', candidate: 'candidate withdrew', not_now: 'not now' };
+const PLINE = { prospect: 'mapped for this role, not approached yet.', intro: 'approached by email, LinkedIn or phone, no conversation yet.', applied: 'applied through LinkedIn or the advert.', rejected: 'not going ahead.' };
+function sinceTxt(iso) { if (!iso) return ''; const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000); return d <= 0 ? 'moved here today' : d === 1 ? 'here 1 day' : 'here ' + d + ' days'; }
+function viewPipeline() {
+  const all = state.pipeline;
+  if (!all.length) return `<div class="empty">The live pipeline appears here after the next sync from the Talento ATS.</div>`;
+  if (state.role !== 'all' && !all.some((r) => r.id === state.role)) state.role = 'all';
+  const chips = all.length > 1 ? `<div class="pchips">${[['all', 'All roles', all.length]].concat(all.map((r) => [r.id, r.title, r.ref])).map((x) => `<button class="pchip ${state.role === x[0] ? 'on' : ''}" data-role="${esc(x[0])}">${esc(x[1])}${x[2] ? `<span>${esc(x[2])}</span>` : ''}</button>`).join('')}</div>` : '';
+  return chips + all.filter((r) => state.role === 'all' || r.id === state.role).map(pipeRole).join('');
+}
+function pipeRole(r) {
+  const counts = r.counts || {}, reach = r.reached || {}, lab = Object.fromEntries(PSTAGES);
+  let maxN = 0; PSTAGES.forEach(([k]) => { if (!PTALLY[k]) maxN = Math.max(maxN, counts[k] || 0); });
+  const strip = PSTAGES.map(([k, l]) => { const n = counts[k] || 0;
+    return `<div class="pst ${n ? 'on' : ''}"><b>${n}</b><span>${l}</span>${typeof reach[k] === 'number' ? `<em>${k === 'rejected' ? 'total' : reach[k] + ' ever here'}</em>` : ''}${!PTALLY[k] && n && maxN ? `<i style="width:${Math.round(100 * n / maxN)}%"></i>` : ''}</div>`; }).join('');
+  const cols = PSTAGES.map(([k, l]) => {
+    let body = '';
+    if (PTALLY[k]) {
+      const bits = [];
+      if (typeof reach[k] === 'number' && k !== 'rejected') bits.push(reach[k] + ' ever at this stage');
+      if (k === 'intro' && r.intro_detail) { const d = r.intro_detail; bits.push(`Emails ${d.emails || 0}, bounced ${d.bounced || 0}. LinkedIn invites ${d.li_invites || 0}, accepted ${d.accepted || 0}. Replied ${d.replied || 0}.`); }
+      if (k === 'rejected' && r.rejected_at) { const parts = Object.keys(r.rejected_at).sort((a, b) => r.rejected_at[b] - r.rejected_at[a]).map((x) => r.rejected_at[x] + ' after ' + (lab[x] || x)); if (parts.length) bits.push('Furthest stage reached: ' + parts.join(', ') + '.');
+        const by = r.rejected_by || {}, bp = Object.keys(by).filter((x) => PREJ[x]).map((x) => by[x] + ' ' + PREJ[x]); if (bp.length) bits.push('Why: ' + bp.join(', ') + '.'); }
+      if (k !== 'rejected') bits.push('Names show from Screening on.');
+      body = `<div class="ptally"><b>${counts[k] || 0}</b>${PLINE[k]}${bits.map((b) => `<div class="w">${esc(b)}</div>`).join('')}</div>`;
+    } else {
+      const here = (r.candidates || []).filter((p) => p.stage === k);
+      body = here.length ? here.map((p) => `<div class="pcard"><div class="nm">${esc(p.name || 'Candidate')}</div>${[p.title, p.company].filter(Boolean).length ? `<div class="sub">${esc([p.title, p.company].filter(Boolean).join(' · '))}</div>` : ''}${p.where ? `<div class="loc">${esc(p.where)}</div>` : ''}<div class="since">${sinceTxt(p.at)}</div>${p.pack ? `<a class="plink" href="${esc(p.pack)}" target="_blank" rel="noopener">Profile and resume</a>` : ''}</div>`).join('') : `<div class="pempty">Nobody here yet</div>`;
+    }
+    return `<div class="pcol"><div class="pcol-h"><h4>${l}</h4><span>${counts[k] || 0}</span></div>${body}</div>`;
+  }).join('');
+  return `<article class="prole">
+    <div class="prole-h"><h3>${esc(r.title || r.id)}</h3>${r.ref ? `<span class="pref">${esc(r.ref)}</span>` : ''}<span class="meta">${[r.location, r.salary].filter(Boolean).map(esc).join(' · ')}</span><span class="meta" style="margin-left:auto">Live from the ATS, ${ago(r.synced)}</span></div>
+    <div class="pstrip" style="--n:${PSTAGES.length}">${strip}</div>
+    <div class="pnote">Big number: there now. Ever here: everyone who has been at that stage, including people who moved on or were rejected later.</div>
+    <div class="pboard">${cols}</div>
+  </article>`;
 }
 
 const tabBtn = (id, label, n) => `<button class="tab ${state.tab === id ? 'on' : ''}" data-tab="${id}">${label}<span class="count">${n}</span></button>`;
@@ -237,7 +335,7 @@ function candCard(c) {
         <div class="card-head" style="margin:0"><div><h3>${esc(c.full_name)}</h3>
           <div class="meta">${esc([c.current_title, c.current_company].filter(Boolean).join(' at '))}${c.location ? ' · ' + esc(c.location) : ''}</div>
           <div class="meta">For: ${esc(s?.title || '')} · Presented ${fmtDate(c.presented_on)}</div></div>
-          ${statusPill(c.status)}</div>
+          <div class="head-r">${starBtn(c)}${statusPill(c.status)}</div></div>
         ${c.summary ? `<p class="summary">${esc(c.summary)}</p>` : ''}
         <div class="links">
           ${c.iqs_report_path ? `<button class="btn-link" data-file="${esc(c.iqs_report_path)}">View IQS™ report</button>` : ''}
@@ -251,7 +349,44 @@ function candCard(c) {
       <div class="fb-send"><button class="btn btn-sm btn-primary" data-send>Send feedback</button></div>
       ${fb.length ? `<div class="fb-log">${fb.map((f) => `<div class="fb-item"><b>${esc(f.author_name)}</b>${f.decision ? ` · ${f.decision === 'Decline' ? 'Pass' : esc(f.decision)}` : ''} <span class="meta">· ${ago(f.created_at)}</span>${f.comment ? `<div>${esc(f.comment)}</div>` : ''}</div>`).join('')}</div>` : ''}
     </div>
+    ${collab(c)}
   </article>`;
+}
+
+/* ---------------- Stars, notes and the conversation with Talento ---------------- */
+const myMark = (cid) => state.marks.find((m) => m.candidate_id === cid && m.user_id === state.user.id) || {};
+const threadOf = (cid) => state.messages.filter((m) => m.candidate_id === cid);
+function unread(cid) {
+  const last = seen[state.user.id + ':' + cid] || '';
+  return threadOf(cid).filter((m) => m.from_talento && m.created_at > last).length;
+}
+const unreadTotal = () => state.candidates.reduce((t, c) => t + unread(c.id), 0);
+function starBtn(c) {
+  const on = !!myMark(c.id).starred;
+  return `<button type="button" class="star ${on ? 'on' : ''}" data-star="${c.id}" aria-pressed="${on}" title="${on ? 'Starred' : 'Star this candidate'}">${on ? '★' : '☆'}</button>`;
+}
+function collab(c) {
+  const msgs = threadOf(c.id), n = unread(c.id), open = !!state.open[c.id];
+  const stars = state.marks.filter((m) => m.candidate_id === c.id && m.starred && m.user_id !== state.user.id).length;
+  const note = state.noteDrafts[c.id] ?? (myMark(c.id).note || '');
+  return `<div class="collab" data-collab="${c.id}">
+    <button type="button" class="collab-t" data-open="${c.id}" aria-expanded="${open}">
+      <span>Conversation with Talento</span>
+      <span class="meta">${msgs.length ? msgs.length + ' message' + (msgs.length > 1 ? 's' : '') : 'Start one'}${n ? ` <b class="badge">${n} new</b>` : ''}${stars ? ` · ★ ${stars} from your team` : ''}</span>
+    </button>
+    ${open ? `<div class="thread">
+      ${msgs.length ? msgs.map((m) => `<div class="msg-b ${m.from_talento ? 'them' : 'me'}"><div class="who-l">${esc(m.author_name || '')} · ${stamp(m.created_at)}</div>${esc(m.body)}</div>`).join('') : `<div class="meta" style="padding:4px 2px">Ask a question, request a call or share a thought. Talento sees it straight away.</div>`}
+      <div class="composer"><textarea data-msg="${c.id}" rows="2" placeholder="Message Talento about ${esc(c.full_name.split(' ')[0])}…">${esc(state.msgDrafts[c.id] || '')}</textarea><button class="btn btn-sm btn-primary" data-sendmsg="${c.id}">Send</button></div>
+      <label class="note-l"><span>Your notes <em>(your team and Talento can see these)</em></span>
+        <textarea data-note="${c.id}" rows="2" placeholder="Private notes on this candidate">${esc(note)}</textarea></label>
+      <div class="fb-send"><button class="btn btn-sm btn-ghost" data-savenote="${c.id}">Save note</button></div>
+    </div>` : ''}
+  </div>`;
+}
+function viewUpdates() {
+  if (!state.activity.length) return `<div class="empty">Every update on your searches appears here as it happens.</div>`;
+  const icon = { message: '💬', star: '★', feedback: '✓', status: '→', candidate: '＋', stage: '↗', document: '📄', search: '◎', request: '✉', update: '•' };
+  return `<div class="card feed">${state.activity.map((a) => `<div class="feed-i"><span class="feed-ic">${icon[a.kind] || '•'}</span><div><div>${esc(a.message)}</div><div class="meta">${stamp(a.created_at)}</div></div>${a.candidate_id ? `<button class="btn-link" data-jump="${a.candidate_id}">Open</button>` : ''}</div>`).join('')}</div>`;
 }
 
 function viewDocs() {
@@ -264,10 +399,12 @@ function viewDocs() {
 }
 
 function wireBody() {
+  document.querySelectorAll('[data-role]').forEach((b) => (b.onclick = () => { state.role = b.dataset.role; render(); }));
   document.querySelectorAll('[data-goto]').forEach((b) => (b.onclick = () => { state.tab = 'shortlist'; state.filter = b.dataset.goto; render(); }));
   const flt = document.getElementById('flt');
   if (flt) flt.onchange = () => { state.filter = flt.value; render(); };
   document.querySelectorAll('[data-file]').forEach((b) => (b.onclick = () => openFile(b.dataset.file)));
+  wireCollab();
   document.querySelectorAll('.fb').forEach((box) => {
     const id = box.dataset.cand;
     const ta = box.querySelector('textarea');
@@ -290,6 +427,53 @@ function wireBody() {
       render();
     };
   });
+}
+
+function wireCollab() {
+  document.querySelectorAll('[data-jump]').forEach((b) => (b.onclick = () => {
+    const c = state.candidates.find((x) => x.id === b.dataset.jump);
+    state.tab = 'shortlist'; state.filter = c ? c.search_id : 'all'; state.open[b.dataset.jump] = true; markSeen(b.dataset.jump); render();
+    document.querySelector(`[data-collab="${b.dataset.jump}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }));
+  document.querySelectorAll('[data-open]').forEach((b) => (b.onclick = () => {
+    const id = b.dataset.open; state.open[id] = !state.open[id]; if (state.open[id]) markSeen(id); render();
+  }));
+  document.querySelectorAll('[data-star]').forEach((b) => (b.onclick = async () => {
+    const id = b.dataset.star, on = !myMark(id).starred;
+    b.disabled = true;
+    const { error } = await sb.from('candidate_marks').upsert({ candidate_id: id, user_id: state.user.id, starred: on }, { onConflict: 'candidate_id,user_id' });
+    if (error) { b.disabled = false; return toast('Could not save: ' + error.message); }
+    toast(on ? 'Starred, Talento can see it' : 'Star removed');
+    refresh();
+  }));
+  document.querySelectorAll('[data-msg]').forEach((t) => {
+    t.oninput = () => { state.msgDrafts[t.dataset.msg] = t.value; };
+    t.onkeydown = (e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) document.querySelector(`[data-sendmsg="${t.dataset.msg}"]`).click(); };
+  });
+  document.querySelectorAll('[data-note]').forEach((t) => (t.oninput = () => { state.noteDrafts[t.dataset.note] = t.value; }));
+  document.querySelectorAll('[data-sendmsg]').forEach((b) => (b.onclick = async () => {
+    const id = b.dataset.sendmsg, body = (state.msgDrafts[id] || '').trim();
+    if (!body) return toast('Write a message first');
+    b.disabled = true;
+    const { error } = await sb.from('candidate_messages').insert({ candidate_id: id, body });
+    if (error) { b.disabled = false; return toast('Could not send: ' + error.message); }
+    delete state.msgDrafts[id]; markSeen(id);
+    document.activeElement?.blur();
+    toast('Sent to Talento');
+    refresh();
+  }));
+  document.querySelectorAll('[data-savenote]').forEach((b) => (b.onclick = async () => {
+    const id = b.dataset.savenote, note = (state.noteDrafts[id] ?? myMark(id).note ?? '').trim();
+    b.disabled = true;
+    const { error } = await sb.from('candidate_marks').upsert({ candidate_id: id, user_id: state.user.id, note: note || null, starred: !!myMark(id).starred }, { onConflict: 'candidate_id,user_id' });
+    if (error) { b.disabled = false; return toast('Could not save: ' + error.message); }
+    delete state.noteDrafts[id]; document.activeElement?.blur();
+    toast('Note saved'); refresh();
+  }));
+}
+function markSeen(cid) {
+  const last = threadOf(cid).reduce((m, x) => (x.created_at > m ? x.created_at : m), '');
+  if (last) { seen[state.user.id + ':' + cid] = last; saveSeen(); }
 }
 
 sb.auth.onAuthStateChange((event) => { if (event === 'PASSWORD_RECOVERY') { needPassword = true; showSetPassword(); } });

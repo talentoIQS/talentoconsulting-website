@@ -7,22 +7,22 @@
 <meta name="robots" content="noindex, nofollow">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="portal.css">
-<!-- Talento Client Portal Admin - v1 (102626) -->
+<link rel="stylesheet" href="portal.css?v=3-102626">
+<!-- Talento Client Portal Admin - v3 (102626): live inbox, two-way messages, client stars and notes -->
 </head>
 <body>
 <div id="app"><div class="loading">Loading admin…</div></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js"></script>
-<script src="common.js"></script>
+<script src="config.js?v=3-102626"></script>
+<script src="common.js?v=3-102626"></script>
 <script>
-const { sb, cfg, esc, fmtDate, ago, safeName, BRAND, STAGES, stagePill, statusPill, toast, openFile } = TP;
+const { sb, cfg, esc, fmtDate, ago, safeName, BRAND, STAGES, stagePill, statusPill, toast, openFile, live, debounce, isTyping, stamp } = TP;
 const app = document.getElementById('app');
 const STAGE_ALL = [...STAGES, 'On hold', 'Closed'];
 const STATUS_ALL = ['Presented', 'Client interview', 'Final round', 'Offer', 'Hired', 'On hold', 'Declined', 'Withdrawn'];
 const DOC_CATS = ['Job spec', 'Proposal', 'Market map', 'IQS report', 'Contract', 'General'];
-let S = { clients: [], client: null, members: [], searches: [], candidates: [], docs: [], feedback: [], tab: 'searches' };
+let S = { clients: [], client: null, members: [], searches: [], candidates: [], docs: [], feedback: [], messages: [], marks: [], activity: [], tab: 'inbox', sel: null, drafts: {}, live: false, pending: false, unseen: 0 };
 
 const opt = (list, v) => list.map((x) => `<option ${x === v ? 'selected' : ''}>${esc(x)}</option>`).join('');
 const val = (id) => document.getElementById(id)?.value.trim() || null;
@@ -45,15 +45,48 @@ async function loadClients(slug) {
 async function loadClient(c) {
   S.client = c;
   history.replaceState(null, '', '?client=' + c.slug);
-  const [m, s, ca, d, f] = await Promise.all([
+  await fetchClient(c);
+  render();
+  goLive();
+}
+
+async function fetchClient(c) {
+  const [m, s, ca, d, f, msg, mk, act] = await Promise.all([
     sb.rpc('admin_list_members', { p_client_id: c.id }),
     sb.from('searches').select('*').eq('client_id', c.id).order('sort_order').order('created_at'),
     sb.from('candidates').select('*').eq('client_id', c.id).order('sort_order').order('created_at'),
     sb.from('documents').select('*').eq('client_id', c.id).order('created_at', { ascending: false }),
-    sb.from('feedback_view').select('*').eq('client_id', c.id).order('created_at', { ascending: false })
+    sb.from('feedback_view').select('*').eq('client_id', c.id).order('created_at', { ascending: false }),
+    sb.from('candidate_messages').select('*').eq('client_id', c.id).order('created_at'),
+    sb.from('candidate_marks').select('*').eq('client_id', c.id),
+    sb.from('activity').select('*').eq('client_id', c.id).order('created_at', { ascending: false }).limit(80)
   ]);
   S.members = m.data || []; S.searches = s.data || []; S.candidates = ca.data || []; S.docs = d.data || []; S.feedback = f.data || [];
-  render();
+  S.messages = msg.data || []; S.marks = mk.data || []; S.activity = act.data || [];
+}
+
+/* ---- Live: client messages, stars, notes and feedback land here as they happen ---- */
+const refresh = debounce(async () => { if (!S.client) return; await fetchClient(S.client); safeRender(); }, 400);
+function safeRender() {
+  if (isTyping()) { S.pending = true; return; }
+  S.pending = false; const y = window.scrollY; render(); window.scrollTo(0, y);
+}
+document.addEventListener('focusout', () => setTimeout(() => { if (S.pending && !isTyping()) safeRender(); }, 150));
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { S.unseen = 0; document.title = 'Portal Admin | Talento Consulting'; } });
+function ping(text) {
+  toast(text);
+  if (document.hidden) { S.unseen++; document.title = '(' + S.unseen + ') Portal Admin | Talento Consulting'; }
+  try { if ('Notification' in window && Notification.permission === 'granted') new Notification('Talento portal', { body: text }); } catch (e) {}
+}
+function goLive() {
+  live(S.client.id, (table, p) => {
+    const r = p.new || {};
+    const who = () => (S.candidates.find((c) => c.id === r.candidate_id) || {}).full_name || 'a candidate';
+    if (p.eventType === 'INSERT' && table === 'candidate_messages' && !r.from_talento) ping((r.author_name || 'Client') + ' on ' + who() + ': ' + (r.body || '').slice(0, 90));
+    if (p.eventType === 'INSERT' && table === 'feedback') ping('New feedback on ' + who());
+    if (table === 'candidate_marks' && r.starred && !(p.old && p.old.starred)) ping('Client starred ' + who());
+    refresh();
+  }, (on) => { S.live = on; const d = document.getElementById('liveDot'); if (d) d.className = 'live' + (on ? ' on' : ''); });
 }
 
 function render() {
@@ -62,6 +95,8 @@ function render() {
   <header class="topbar"><div class="topbar-in">
     <a class="brand" href="/">${BRAND}</a><span class="x">·</span><b>Portal admin</b>
     <div class="spacer"></div>
+    <span id="liveDot" class="live${S.live ? ' on' : ''}" title="Client activity arrives automatically"><i></i>Live</span>
+    ${'Notification' in window && Notification.permission === 'default' ? `<button class="btn btn-sm btn-ghost" id="notif">Turn on alerts</button>` : ''}
     ${c ? `<a class="btn btn-sm btn-ghost" href="./?client=${esc(c.slug)}">View as client</a>` : ''}
     <button class="btn btn-sm btn-primary" id="out">Sign out</button>
   </div></header>
@@ -85,8 +120,45 @@ function clientPanel(c) {
   return `
   <div class="hero" style="margin-bottom:12px"><div><div class="eyebrow">Client</div><h1 style="font-size:30px">${esc(c.name)}</h1>
     <p class="meta">Portal link: ${esc(location.origin)}/portal/?client=${esc(c.slug)}</p></div></div>
-  <nav class="tabs">${t('searches', 'Searches')}${t('candidates', 'Candidates')}${t('documents', 'Documents')}${t('feedback', 'Feedback (' + S.feedback.length + ')')}${t('people', 'Client logins')}${t('settings', 'Branding')}</nav>
-  ${({ searches: tabSearches, candidates: tabCands, documents: tabDocs, feedback: tabFeedback, people: tabPeople, settings: tabSettings })[S.tab]()}`;
+  <nav class="tabs">${t('inbox', 'Live inbox' + (unanswered() ? ' (' + unanswered() + ')' : ''))}${t('searches', 'Searches')}${t('candidates', 'Candidates')}${t('documents', 'Documents')}${t('feedback', 'Feedback (' + S.feedback.length + ')')}${t('people', 'Client logins')}${t('settings', 'Branding')}</nav>
+  ${({ inbox: tabInbox, searches: tabSearches, candidates: tabCands, documents: tabDocs, feedback: tabFeedback, people: tabPeople, settings: tabSettings })[S.tab]()}`;
+}
+
+/* ---- Live inbox ---- */
+const memberName = (uid) => (S.members.find((m) => m.user_id === uid) || {}).full_name || (S.members.find((m) => m.user_id === uid) || {}).email || 'Talento';
+const lastAt = (cid) => [...S.messages.filter((m) => m.candidate_id === cid).map((m) => m.created_at), ...S.marks.filter((m) => m.candidate_id === cid).map((m) => m.updated_at), ...S.feedback.filter((f) => f.candidate_id === cid).map((f) => f.created_at)].sort().pop() || '';
+const needsReply = (cid) => { const t = S.messages.filter((m) => m.candidate_id === cid); return t.length && !t[t.length - 1].from_talento; };
+const unanswered = () => S.candidates.filter((c) => needsReply(c.id)).length;
+function tabInbox() {
+  if (!S.candidates.length) return `<div class="empty">Present candidates first. Client messages, stars and feedback on them land here live.</div>`;
+  const list = [...S.candidates].sort((a, b) => (needsReply(b.id) - needsReply(a.id)) || lastAt(b.id).localeCompare(lastAt(a.id)));
+  if (!S.sel || !S.candidates.some((c) => c.id === S.sel)) S.sel = list[0].id;
+  const c = S.candidates.find((x) => x.id === S.sel);
+  const thread = S.messages.filter((m) => m.candidate_id === c.id);
+  const marks = S.marks.filter((m) => m.candidate_id === c.id && (m.starred || m.note));
+  const fb = S.feedback.filter((f) => f.candidate_id === c.id);
+  return `<div class="inbox">
+    <div class="inbox-list">${list.map((x) => {
+      const t = S.messages.filter((m) => m.candidate_id === x.id), last = t[t.length - 1];
+      const st = S.marks.filter((m) => m.candidate_id === x.id && m.starred).length;
+      return `<button data-sel="${x.id}" class="${x.id === c.id ? 'on' : ''}"><b>${esc(x.full_name)}${needsReply(x.id) ? ' <span class="badge">reply</span>' : ''}${st ? ` <span style="color:#d97706">★${st}</span>` : ''}</b>
+        <span class="meta">${esc(S.searches.find((s) => s.id === x.search_id)?.title || '')} · ${esc(x.status)}</span>
+        <span class="snip">${last ? esc(last.author_name + ': ' + last.body) : fb.length && x.id === c.id ? '' : 'No messages yet'}</span></button>`;
+    }).join('')}</div>
+    <div class="card">
+      <div class="card-head"><div><h3>${esc(c.full_name)}</h3><div class="meta">${esc([c.current_title, c.current_company].filter(Boolean).join(' at '))} · ${esc(S.searches.find((s) => s.id === c.search_id)?.title || '')}</div></div>${statusPill(c.status)}</div>
+      ${marks.length ? marks.map((m) => `<div class="client-marks">${m.starred ? '<b style="color:#d97706">★ Starred</b> ' : ''}<b>${esc(memberName(m.user_id))}</b>${m.note ? ': ' + esc(m.note) : ''} <span class="meta">· ${ago(m.updated_at)}</span></div>`).join('') : ''}
+      ${fb.length ? fb.map((f) => `<div class="client-marks"><b>${esc(f.author_name)}</b> gave feedback${f.recommendation || f.decision ? ': ' + esc(f.recommendation || (f.decision === 'Decline' ? 'Pass' : f.decision)) : ''}${f.comment ? ' · ' + esc(f.comment) : ''} <span class="meta">· ${ago(f.created_at)}</span></div>`).join('') : ''}
+      <div class="thread" style="margin-top:12px">
+        ${thread.length ? thread.map((m) => `<div class="msg-b ${m.from_talento ? 'me' : 'them'}"><div class="who-l">${esc(m.author_name || '')} · ${stamp(m.created_at)}</div>${esc(m.body)}</div>`).join('') : `<div class="meta">No messages on ${esc(c.full_name.split(' ')[0])} yet. Start the conversation, ${esc(S.client.name)} sees it instantly.</div>`}
+        <div class="composer"><textarea id="reply" rows="2" placeholder="Reply to ${esc(S.client.name)} about ${esc(c.full_name.split(' ')[0])}…">${esc(S.drafts[c.id] || '')}</textarea><button class="btn btn-sm btn-primary" id="reply_go">Send</button></div>
+        <div class="meta">Ctrl or Cmd + Enter sends.</div>
+      </div>
+    </div>
+  </div>
+  <div class="section" style="margin-top:20px"><h2>Activity</h2>
+    ${S.activity.length ? `<div class="card feed">${S.activity.map((a) => `<div class="feed-i"><span class="feed-ic">•</span><div><div>${esc(a.message)}</div><div class="meta">${esc(a.actor || '')}${a.actor ? ' · ' : ''}${stamp(a.created_at)}</div></div>${a.candidate_id ? `<button class="btn-link" data-sel="${a.candidate_id}">Open</button>` : ''}</div>`).join('')}</div>` : '<div class="empty">Nothing yet.</div>'}
+  </div>`;
 }
 
 /* ---- Searches ---- */
@@ -128,7 +200,7 @@ function tabCands() {
   ${S.candidates.length ? `<div class="card"><table class="table"><thead><tr><th style="width:26%">Candidate</th><th>Status</th><th style="width:30%">Summary</th><th>IQS™ report</th><th>Visible</th><th></th></tr></thead><tbody>
     ${S.candidates.map((c) => `<tr data-row="${c.id}">
       <td><input data-f="full_name" value="${esc(c.full_name)}"><input data-f="current_title" value="${esc(c.current_title || '')}" placeholder="Title" style="margin-top:6px"><input data-f="current_company" value="${esc(c.current_company || '')}" placeholder="Company" style="margin-top:6px">
-        <div class="meta" style="margin-top:6px">${esc(S.searches.find((s) => s.id === c.search_id)?.title || '')}</div></td>
+        <div class="meta" style="margin-top:6px">${esc(S.searches.find((s) => s.id === c.search_id)?.title || '')}${S.marks.some((m) => m.candidate_id === c.id && m.starred) ? ' · <b style="color:#d97706">★ ' + S.marks.filter((m) => m.candidate_id === c.id && m.starred).length + '</b>' : ''} · <button class="btn-link" data-sel="${c.id}">Messages</button></div></td>
       <td><select data-f="status">${opt(STATUS_ALL, c.status)}</select></td>
       <td><textarea data-f="summary" rows="4">${esc(c.summary || '')}</textarea><input data-f="linkedin_url" value="${esc(c.linkedin_url || '')}" placeholder="LinkedIn URL" style="margin-top:6px"></td>
       <td>${c.iqs_report_path ? `<button class="btn-link" data-file="${esc(c.iqs_report_path)}">Open</button><br>` : ''}<input type="file" data-iqs="${c.id}" accept=".pdf,.doc,.docx" style="font-size:12px;border:0;padding:4px 0"></td>
@@ -215,6 +287,20 @@ function wire() {
   document.querySelectorAll('[data-client]').forEach((b) => (b.onclick = () => loadClient(S.clients.find((c) => c.id === b.dataset.client))));
   document.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => { S.tab = b.dataset.tab; render(); }));
   document.querySelectorAll('[data-file]').forEach((b) => (b.onclick = () => openFile(b.dataset.file)));
+  on('notif', async () => { try { await Notification.requestPermission(); } catch (e) {} render(); });
+  document.querySelectorAll('[data-sel]').forEach((b) => (b.onclick = () => { S.sel = b.dataset.sel; S.tab = 'inbox'; render(); window.scrollTo(0, 0); }));
+  const rp = document.getElementById('reply');
+  if (rp) {
+    rp.oninput = () => { S.drafts[S.sel] = rp.value; };
+    rp.onkeydown = (e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) document.getElementById('reply_go').click(); };
+  }
+  on('reply_go', async (e) => {
+    const body = (S.drafts[S.sel] || '').trim(); if (!body) return toast('Write a reply first');
+    e.target.disabled = true;
+    const { error } = await sb.from('candidate_messages').insert({ candidate_id: S.sel, body });
+    if (error) { e.target.disabled = false; return toast('Error: ' + error.message); }
+    delete S.drafts[S.sel]; document.activeElement?.blur(); toast('Sent'); refresh();
+  });
 
   on('nc_go', async () => {
     const name = val('nc_name'); if (!name) return toast('Add a name');
