@@ -245,3 +245,26 @@ table.docs{width:100%;border-collapse:collapse;background:#fff;border:1px solid 
 .hm b{color:var(--text);font-weight:600}
 .card h3 .pref{vertical-align:middle;margin-left:6px}
 .prole-h .hm{margin:0}
+/* v3.3: search detail and candidate profile */
+.card.click{cursor:pointer;transition:.15s}
+.card.click:hover{border-color:var(--client);box-shadow:0 0 0 3px rgba(26,92,232,.10),var(--shadow)}
+.pcard.click{cursor:pointer}
+.pcard.click:hover{border-color:var(--client)}
+.jobview h2{font-size:24px;letter-spacing:-.02em}
+.cgroup{margin-top:18px}
+.cgroup h4{margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);display:flex;align-items:center;gap:6px}
+.cgroup .count{background:var(--bg2);border-radius:999px;font-size:12px;padding:1px 8px;color:var(--text);letter-spacing:0}
+.clist{display:flex;flex-direction:column;gap:6px}
+.crow{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:#fff;border:1px solid var(--border);border-radius:12px;padding:10px 14px;color:var(--text)}
+.crow:hover{border-color:var(--client);box-shadow:0 0 0 3px rgba(26,92,232,.10)}
+.crow-main{flex:1;min-width:0;display:flex;flex-direction:column}
+.crow-main .meta{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.crow-side{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.avatar.sm{width:36px;height:36px;font-size:13px;flex:none}
+.tag{font-size:11.5px;font-weight:600;background:var(--bg);border:1px solid var(--border);border-radius:999px;padding:2px 8px;white-space:nowrap}
+.tag.star-t{color:#b45309;background:#fdf3dc;border-color:#f3d9a4}
+.drawer-ov{position:fixed;inset:0;z-index:60;background:rgba(15,27,48,.45);display:flex;justify-content:flex-end}
+.drawer{position:relative;width:min(640px,100%);height:100%;overflow-y:auto;background:var(--bg);padding:18px 18px 40px;box-shadow:-20px 0 60px rgba(15,27,48,.25)}
+.drawer .card{box-shadow:none}
+.drawer-x{position:sticky;top:0;float:right;z-index:2;width:36px;height:36px;border-radius:50%;border:1px solid var(--border);background:#fff;font-size:20px;line-height:1;margin-bottom:8px}
+@media (max-width:900px){.crow{flex-wrap:wrap}.crow-side{width:100%;justify-content:flex-start}}

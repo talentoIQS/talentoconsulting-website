@@ -7,15 +7,15 @@
 <meta name="robots" content="noindex, nofollow">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="portal.css?v=3.2-102626">
-<!-- Talento Client Portal - v3.2 (102626): ATS-fed, live updates, stars, notes and two-way messages -->
+<link rel="stylesheet" href="portal.css?v=3.3-102626">
+<!-- Talento Client Portal - v3.3 (102626): ATS-fed, live updates, stars, notes and two-way messages -->
 </head>
 <body>
 <div id="app"><div class="loading">Loading your portal…</div></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js?v=3.2-102626"></script>
-<script src="common.js?v=3.2-102626"></script>
+<script src="config.js?v=3.3-102626"></script>
+<script src="common.js?v=3.3-102626"></script>
 <script>
 const { sb, esc, fmtDate, ago, initials, BRAND, STAGES, stagePill, statusPill, toast, openFile, applyClientTheme, live, debounce, isTyping, stamp } = TP;
 const app = document.getElementById('app');
@@ -224,7 +224,7 @@ function render() {
       ${tabBtn('documents', 'Documents', docs.length)}
       ${tabBtn('updates', 'Updates', unreadTotal() || state.activity.length)}
     </nav>
-    <div id="body">${state.tab === 'pipeline' ? viewPipeline() : state.tab === 'overview' ? viewSearches() : state.tab === 'shortlist' ? viewShortlist() : state.tab === 'updates' ? viewUpdates() : viewDocs()}</div>
+    <div id="body">${state.tab === 'job' ? viewJob() : state.tab === 'pipeline' ? viewPipeline() : state.tab === 'overview' ? viewSearches() : state.tab === 'shortlist' ? viewShortlist() : state.tab === 'updates' ? viewUpdates() : viewDocs()}</div>
 
     <section class="contact">
       <div><b>${esc(client.talento_contact_name || 'Martin Wickes')}</b><p>Your Talento partner. Questions on any search, just reach out.</p></div>
@@ -238,7 +238,8 @@ function render() {
         </div>
       </div>
     </section>
-  </main>`;
+  </main>
+  ${drawer()}`;
 
   document.getElementById('out').onclick = signOut;
   const mb = document.getElementById('mailBtn'), mm = document.getElementById('mailMenu');
@@ -287,7 +288,7 @@ function pipeRole(r) {
       body = `<div class="ptally"><b>${counts[k] || 0}</b>${PLINE[k]}${bits.map((b) => `<div class="w">${esc(b)}</div>`).join('')}</div>`;
     } else {
       const here = (r.candidates || []).filter((p) => p.stage === k);
-      body = here.length ? here.map((p) => `<div class="pcard"><div class="nm">${esc(p.name || 'Candidate')}</div>${[p.title, p.company].filter(Boolean).length ? `<div class="sub">${esc([p.title, p.company].filter(Boolean).join(' · '))}</div>` : ''}${p.where ? `<div class="loc">${esc(p.where)}</div>` : ''}<div class="since">${sinceTxt(p.at)}</div>${p.pack ? `<a class="plink" href="${esc(p.pack)}" target="_blank" rel="noopener">Profile and resume</a>` : ''}</div>`).join('') : `<div class="pempty">Nobody here yet</div>`;
+      body = here.length ? here.map((p) => `<div class="pcard${candByAts(p.id) ? ' click' : ''}"${candByAts(p.id) ? ` data-cand-open="${candByAts(p.id).id}" role="button" tabindex="0"` : ''}><div class="nm">${esc(p.name || 'Candidate')}</div>${[p.title, p.company].filter(Boolean).length ? `<div class="sub">${esc([p.title, p.company].filter(Boolean).join(' · '))}</div>` : ''}${p.where ? `<div class="loc">${esc(p.where)}</div>` : ''}<div class="since">${sinceTxt(p.at)}</div>${p.pack ? `<a class="plink" href="${esc(p.pack)}" target="_blank" rel="noopener">Profile and resume</a>` : ''}</div>`).join('') : `<div class="pempty">Nobody here yet</div>`;
     }
     return `<div class="pcol"><div class="pcol-h"><h4>${l}</h4><span>${counts[k] || 0}</span></div>${body}</div>`;
   }).join('');
@@ -306,16 +307,57 @@ function viewSearches() {
   return `<div class="grid2">${state.searches.map((s) => {
     const idx = STAGES.indexOf(s.stage);
     const n = state.candidates.filter((c) => c.search_id === s.id && !['Declined', 'Withdrawn'].includes(c.status)).length;
-    return `<article class="card">
+    return `<article class="card click" data-job="${s.id}" role="button" tabindex="0">
       <div class="card-head"><div><h3>${esc(s.title)}${s.ref ? ` <span class="pref">${esc(s.ref)}</span>` : ''}</h3>${s.hiring_manager ? `<div class="hm">Hiring manager: <b>${esc(s.hiring_manager)}</b></div>` : ''}<div class="meta">${[s.location, s.compensation].filter(Boolean).map(esc).join(' · ')}</div></div>${stagePill(s.stage)}</div>
       ${s.summary ? `<p style="margin:0;font-size:14px">${esc(s.summary)}</p>` : ''}
       ${idx >= 0 ? `<div class="pipeline">${STAGES.map((_, i) => `<div class="${i < idx ? 'done' : i === idx ? 'now' : ''}"></div>`).join('')}</div>
       <div class="pipe-labels">${STAGES.map((x) => `<span>${x}</span>`).join('')}</div>` : ''}
       ${s.next_steps ? `<div class="next"><b>Next steps</b>${esc(s.next_steps)}</div>` : ''}
-      <div class="card-foot"><span>Updated ${ago(s.updated_at)}</span>${n ? `<button class="btn-link" data-goto="${s.id}">${n} candidate${n > 1 ? 's' : ''} →</button>` : ''}</div>
+      <div class="card-foot"><span>Updated ${ago(s.updated_at)}</span><span class="btn-link">${n ? `View ${n} candidate${n > 1 ? 's' : ''} →` : 'Open search →'}</span></div>
     </article>`;
   }).join('')}</div>`;
 }
+
+/* ---------------- One search: every candidate, grouped by stage ---------------- */
+const candByAts = (id) => id && state.candidates.find((c) => c.ats_id === id);
+const STATUS_ORDER = ['Offer', 'Final round', 'Client interview', 'Presented', 'Screening', 'On hold', 'Hired', 'Declined', 'Withdrawn'];
+const STATUS_LABEL = { Screening: 'Talento screening (only you see these)', Presented: 'Presented, awaiting your review' };
+function viewJob() {
+  const s = state.searches.find((x) => x.id === state.job);
+  if (!s) { state.tab = 'overview'; return viewSearches(); }
+  const list = state.candidates.filter((c) => c.search_id === s.id);
+  const groups = STATUS_ORDER.map((st) => [st, list.filter((c) => c.status === st)]).filter(([, l]) => l.length);
+  const row = (c) => {
+    const msgs = threadOf(c.id).length, n = unread(c.id), stars = state.marks.filter((m) => m.candidate_id === c.id && m.starred).length;
+    return `<button class="crow" data-cand-open="${c.id}">
+      <span class="avatar sm" style="background:var(--client)">${esc(initials(c.full_name))}</span>
+      <span class="crow-main"><b>${esc(c.full_name)}</b><span class="meta">${esc([c.current_title, c.current_company].filter(Boolean).join(' at '))}${c.location ? ' · ' + esc(c.location) : ''}</span></span>
+      <span class="crow-side">${c.resume_path ? '<span class="tag">Resume</span>' : ''}${stars ? `<span class="tag star-t">★ ${stars}</span>` : ''}${msgs ? `<span class="tag">💬 ${msgs}</span>` : ''}${n ? `<span class="badge">${n} new</span>` : ''}${statusPill(c.status)}</span>
+    </button>`;
+  };
+  return `<div class="jobview">
+    <button class="btn-link" data-back>← All searches</button>
+    <div class="card" style="margin-top:10px">
+      <div class="card-head"><div><h2 style="margin:0">${esc(s.title)}${s.ref ? ` <span class="pref">${esc(s.ref)}</span>` : ''}</h2>
+        ${s.hiring_manager ? `<div class="hm">Hiring manager: <b>${esc(s.hiring_manager)}</b></div>` : ''}
+        <div class="meta">${[s.location, s.compensation].filter(Boolean).map(esc).join(' · ')}</div></div>${stagePill(s.stage)}</div>
+      ${s.summary ? `<p style="margin:0 0 6px;font-size:14px">${esc(s.summary)}</p>` : ''}
+      ${s.next_steps ? `<div class="next"><b>Next steps</b>${esc(s.next_steps)}</div>` : ''}
+    </div>
+    ${groups.length ? groups.map(([st, l]) => `<section class="cgroup"><h4>${esc(STATUS_LABEL[st] || st)} <span class="count">${l.length}</span></h4><div class="clist">${l.map(row).join('')}</div></section>`).join('')
+      : `<div class="empty" style="margin-top:14px">No candidates on this search yet. They appear here the moment Talento moves them forward.</div>`}
+  </div>`;
+}
+function drawer() {
+  const c = state.cand && state.candidates.find((x) => x.id === state.cand);
+  if (!c) return '';
+  state.open[c.id] = true;
+  return `<div class="drawer-ov" data-close-drawer><aside class="drawer" role="dialog" aria-label="${esc(c.full_name)}">
+    <button class="drawer-x" data-close-drawer aria-label="Close">×</button>
+    ${candCard(c)}
+  </aside></div>`;
+}
+function openCand(id) { state.cand = id; state.open[id] = true; markSeen(id); render(); }
 
 function viewShortlist() {
   const list = state.candidates.filter((c) => state.filter === 'all' || c.search_id === state.filter);
@@ -339,7 +381,8 @@ function candCard(c) {
           <div class="head-r">${starBtn(c)}${statusPill(c.status)}</div></div>
         ${c.summary ? `<p class="summary">${esc(c.summary)}</p>` : ''}
         <div class="links">
-          ${c.iqs_report_path ? `<button class="btn-link" data-file="${esc(c.iqs_report_path)}">View IQS™ report</button>` : ''}
+          ${c.resume_path ? `<button class="btn btn-sm btn-primary" data-file="${esc(c.resume_path)}">Open resume</button>` : ''}
+          ${c.iqs_report_path ? `<button class="btn btn-sm btn-ghost" data-file="${esc(c.iqs_report_path)}">View IQS™ report</button>` : ''}
           ${c.linkedin_url ? `<a href="${esc(c.linkedin_url)}" target="_blank" rel="noopener">LinkedIn ↗</a>` : ''}
         </div>
       </div>
@@ -401,7 +444,16 @@ function viewDocs() {
 
 function wireBody() {
   document.querySelectorAll('[data-role]').forEach((b) => (b.onclick = () => { state.role = b.dataset.role; render(); }));
-  document.querySelectorAll('[data-goto]').forEach((b) => (b.onclick = () => { state.tab = 'shortlist'; state.filter = b.dataset.goto; render(); }));
+  document.querySelectorAll('[data-job]').forEach((b) => {
+    const go = () => { state.job = b.dataset.job; state.tab = 'job'; render(); window.scrollTo(0, 0); };
+    b.onclick = go; b.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } };
+  });
+  document.querySelectorAll('[data-back]').forEach((b) => (b.onclick = () => { state.tab = 'overview'; render(); }));
+  document.querySelectorAll('[data-cand-open]').forEach((b) => {
+    b.onclick = () => openCand(b.dataset.candOpen);
+    b.onkeydown = (e) => { if (e.key === 'Enter') openCand(b.dataset.candOpen); };
+  });
+  document.querySelectorAll('[data-close-drawer]').forEach((b) => (b.onclick = (e) => { if (e.target === b) { state.cand = null; render(); } }));
   const flt = document.getElementById('flt');
   if (flt) flt.onchange = () => { state.filter = flt.value; render(); };
   document.querySelectorAll('[data-file]').forEach((b) => (b.onclick = () => openFile(b.dataset.file)));
@@ -477,6 +529,7 @@ function markSeen(cid) {
   if (last) { seen[state.user.id + ':' + cid] = last; saveSeen(); }
 }
 
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && state.cand) { state.cand = null; render(); } });
 sb.auth.onAuthStateChange((event) => { if (event === 'PASSWORD_RECOVERY') { needPassword = true; showSetPassword(); } });
 boot();
 </script>
