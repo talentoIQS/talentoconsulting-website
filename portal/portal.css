@@ -324,3 +324,13 @@ table.docs{width:100%;border-collapse:collapse;background:#fff;border:1px solid 
 .orline::before,.orline::after{content:"";flex:1;height:1px;background:var(--border)}
 .ckgrid{display:flex;flex-wrap:wrap;gap:4px 6px;padding:6px 0}
 .ckgrid .ck{border:1px solid var(--border);border-radius:999px;padding:5px 11px;background:#fff;margin:0}
+/* v3.7: candidates in a search show as cards */
+.clist{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.crow{display:grid;grid-template-columns:44px 1fr;grid-template-rows:auto auto;align-items:start;gap:10px 12px;padding:14px;border-radius:14px;box-shadow:var(--shadow);min-height:132px;transition:.15s}
+.crow:hover{transform:translateY(-1px)}
+.crow .avatar.sm{width:44px;height:44px;font-size:14px}
+.crow-main{gap:3px}
+.crow-main b{font-size:15.5px;line-height:1.25}
+.crow-main .meta{white-space:normal;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;line-height:1.35}
+.crow-side{grid-column:1 / -1;justify-content:flex-start;align-self:end;border-top:1px solid var(--border);padding-top:9px}
+@media (max-width:900px){.crow{flex-wrap:nowrap}.crow-side{width:auto}}
