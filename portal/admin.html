@@ -7,22 +7,22 @@
 <meta name="robots" content="noindex, nofollow">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="portal.css?v=3.5-102626">
+<link rel="stylesheet" href="portal.css?v=3.6-102626">
 <!-- Talento Client Portal Admin - v3 (102626): live inbox, two-way messages, client stars and notes -->
 </head>
 <body>
 <div id="app"><div class="loading">Loading admin…</div></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js?v=3.5-102626"></script>
-<script src="common.js?v=3.5-102626"></script>
+<script src="config.js?v=3.6-102626"></script>
+<script src="common.js?v=3.6-102626"></script>
 <script>
 const { sb, cfg, esc, fmtDate, ago, safeName, BRAND, STAGES, stagePill, statusPill, toast, openFile, live, debounce, isTyping, stamp } = TP;
 const app = document.getElementById('app');
 const STAGE_ALL = [...STAGES, 'On hold', 'Closed'];
 const STATUS_ALL = ['Presented', 'Client interview', 'Final round', 'Offer', 'Hired', 'On hold', 'Declined', 'Withdrawn'];
 const DOC_CATS = ['Job spec', 'Proposal', 'Market map', 'IQS report', 'Contract', 'General'];
-let S = { clients: [], client: null, members: [], searches: [], candidates: [], docs: [], feedback: [], messages: [], marks: [], activity: [], tab: 'inbox', sel: null, drafts: {}, live: false, pending: false, unseen: 0 };
+let S = { roles: [], mc: [], requests: [], clients: [], client: null, members: [], searches: [], candidates: [], docs: [], feedback: [], messages: [], marks: [], activity: [], tab: 'inbox', sel: null, drafts: {}, live: false, pending: false, unseen: 0 };
 
 const opt = (list, v) => list.map((x) => `<option ${x === v ? 'selected' : ''}>${esc(x)}</option>`).join('');
 const val = (id) => document.getElementById(id)?.value.trim() || null;
@@ -63,7 +63,33 @@ async function fetchClient(c) {
   ]);
   S.members = m.data || []; S.searches = s.data || []; S.candidates = ca.data || []; S.docs = d.data || []; S.feedback = f.data || [];
   S.messages = msg.data || []; S.marks = mk.data || []; S.activity = act.data || [];
+  const [mr, mc, fr] = await Promise.all([
+    sb.from('member_roles').select('*').eq('client_id', c.id),
+    sb.from('member_candidates').select('*').eq('client_id', c.id),
+    sb.from('feedback_requests').select('*').eq('client_id', c.id).order('created_at', { ascending: false })
+  ]);
+  S.roles = mr.data || []; S.mc = mc.data || []; S.requests = fr.data || [];
+  backfillResumeLinks();
 }
+
+/* feedback links carry a resume link that lasts 14 days; fill any that the hourly sync created */
+const RESUME_LINK_SECS = 14 * 24 * 3600;
+async function signResume(c) {
+  if (!c || !c.resume_path) return null;
+  const { data } = await sb.storage.from(cfg.bucket).createSignedUrl(c.resume_path, RESUME_LINK_SECS);
+  return data ? data.signedUrl : null;
+}
+let backfilling = false;
+async function backfillResumeLinks() {
+  if (backfilling) return; backfilling = true;
+  try {
+    for (const r of S.requests.filter((x) => x.status === 'Pending' && !x.resume_url)) {
+      const url = await signResume(S.candidates.find((c) => c.id === r.candidate_id));
+      if (url) await sb.from('feedback_requests').update({ resume_url: url }).eq('id', r.id);
+    }
+  } finally { backfilling = false; }
+}
+const linkFor = (r) => location.origin + '/portal/feedback.html?t=' + r.token;
 
 /* ---- Live: client messages, stars, notes and feedback land here as they happen ---- */
 const refresh = debounce(async () => { if (!S.client) return; await fetchClient(S.client); safeRender(); }, 400);
@@ -208,7 +234,9 @@ function tabCands() {
       <td><div class="meta">Resume</div>${c.resume_path ? `<button class="btn-link" data-file="${esc(c.resume_path)}">Open resume</button><br>` : ''}<input type="file" data-resume="${c.id}" accept=".pdf,.doc,.docx" style="font-size:12px;border:0;padding:4px 0">
         <div class="meta" style="margin-top:6px">IQS™ report</div>${c.iqs_report_path ? `<button class="btn-link" data-file="${esc(c.iqs_report_path)}">Open</button><br>` : ''}<input type="file" data-iqs="${c.id}" accept=".pdf,.doc,.docx" style="font-size:12px;border:0;padding:4px 0"></td>
       <td><input type="checkbox" data-f="visible_to_client" ${c.visible_to_client ? 'checked' : ''} style="width:auto"></td>
-      <td style="white-space:nowrap"><button class="btn btn-sm btn-primary" data-save="candidates">Save</button> <button class="btn-link" data-del="candidates" style="color:var(--red)">Delete</button></td>
+      <td style="white-space:nowrap"><button class="btn btn-sm btn-primary" data-save="candidates">Save</button> <button class="btn-link" data-del="candidates" style="color:var(--red)">Delete</button>
+        <div style="margin-top:8px"><button class="btn-link" data-fblink="${c.id}">Interview feedback link</button></div>
+        ${S.requests.filter((r) => r.candidate_id === c.id).map((r) => `<div class="meta" style="margin-top:4px">${esc(r.interviewer_name)} · ${esc(r.status)} · <button class="btn-link" data-copy-link="${esc(r.token)}">Copy link</button></div>`).join('')}</td>
     </tr>`).join('')}</tbody></table></div>` : ''}`;
 }
 
@@ -252,7 +280,24 @@ function tabPeople() {
   ${S.members.length ? `<div class="card"><table class="table"><thead><tr><th>Name</th><th>Email</th><th>Title</th><th>Last sign-in</th><th></th></tr></thead><tbody>
     ${S.members.map((m) => `<tr><td><b>${esc(m.full_name || '')}</b></td><td>${esc(m.email)}</td><td>${esc(m.job_title || '')}</td><td class="meta">${m.last_sign_in_at ? ago(m.last_sign_in_at) : 'Not yet'}</td>
       <td><button class="btn-link" data-unlink="${m.user_id}" style="color:var(--red)">Remove access</button></td></tr>`).join('')}
-  </tbody></table></div>` : '<div class="empty">No client logins yet.</div>'}`;
+  </tbody></table></div>
+  <div class="section card" style="margin-top:16px"><h2>What each person sees</h2>
+    <div class="note">Leave everything blank and a person sees every search. Tick <b>Hiring manager</b> to give the full board for a search, or <b>Interviewer</b> to show only the candidates you assign them, each with a scorecard. Use <b>Preview as</b> on the portal to check their view.</div>
+    ${S.members.map(accessCard).join('')}
+  </div>` : '<div class="empty">No client logins yet.</div>'}`;
+}
+function accessCard(m) {
+  const mine = S.roles.filter((r) => r.user_id === m.user_id);
+  const opt = (sid, v, l) => `<option value="${v}" ${((mine.find((r) => r.search_id === sid) || {}).access || '') === v ? 'selected' : ''}>${l}</option>`;
+  return `<div class="acc" data-acc="${m.user_id}"><div class="acc-h"><b>${esc(m.full_name || m.email)}</b><span class="meta">${mine.length ? (mine.every((r) => r.access === 'interviewer') ? 'Interviewer' : 'Hiring manager on ' + mine.filter((r) => r.access === 'hm').length + ' search' + (mine.filter((r) => r.access === 'hm').length === 1 ? '' : 'es')) : 'Sees every search'}</span></div>
+    <table class="table"><tbody>${S.searches.map((x) => {
+      const acc = (mine.find((r) => r.search_id === x.id) || {}).access || '';
+      const cands = S.candidates.filter((c) => c.search_id === x.id && c.visible_to_client);
+      return `<tr><td style="width:44%"><b>${esc(x.title)}</b> <span class="meta">${esc(x.ref || '')}</span></td>
+        <td style="width:22%"><select data-acc-role="${x.id}">${opt(x.id, '', 'No access')}${opt(x.id, 'hm', 'Hiring manager')}${opt(x.id, 'interviewer', 'Interviewer')}</select></td>
+        <td>${acc === 'interviewer' ? (cands.length ? cands.map((c) => `<label class="ck"><input type="checkbox" data-acc-cand="${c.id}" ${S.mc.some((z) => z.user_id === m.user_id && z.candidate_id === c.id) ? 'checked' : ''}> ${esc(c.full_name)}</label>`).join('') : '<span class="meta">No presented candidates yet</span>') : ''}</td></tr>`;
+    }).join('')}</tbody></table>
+    <button class="btn btn-sm btn-primary" data-acc-save="${m.user_id}">Save access for ${esc((m.full_name || m.email).split(' ')[0])}</button></div>`;
 }
 
 /* ---- Settings ---- */
@@ -290,6 +335,38 @@ function wire() {
   document.querySelectorAll('[data-client]').forEach((b) => (b.onclick = () => loadClient(S.clients.find((c) => c.id === b.dataset.client))));
   document.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => { S.tab = b.dataset.tab; render(); }));
   document.querySelectorAll('[data-file]').forEach((b) => (b.onclick = () => openFile(b.dataset.file)));
+  document.querySelectorAll('[data-acc-save]').forEach((b) => (b.onclick = async () => {
+    const uid = b.dataset.accSave, box = b.closest('[data-acc]');
+    const roles = [...box.querySelectorAll('[data-acc-role]')].filter((x) => x.value).map((x) => ({ client_id: S.client.id, user_id: uid, search_id: x.dataset.accRole, access: x.value }));
+    const cands = [...box.querySelectorAll('[data-acc-cand]:checked')].map((x) => ({ client_id: S.client.id, user_id: uid, candidate_id: x.dataset.accCand }));
+    b.disabled = true;
+    let r = await sb.from('member_roles').delete().eq('client_id', S.client.id).eq('user_id', uid);
+    if (!r.error && roles.length) r = await sb.from('member_roles').insert(roles);
+    if (!r.error) r = await sb.from('member_candidates').delete().eq('client_id', S.client.id).eq('user_id', uid);
+    if (!r.error && cands.length) r = await sb.from('member_candidates').insert(cands);
+    if (done(r.error, 'Access saved')) loadClient(S.client); else b.disabled = false;
+  }));
+  document.querySelectorAll('[data-acc-role]').forEach((sel) => (sel.onchange = async () => {
+    const uid = sel.closest('[data-acc]').dataset.acc;
+    S.roles = S.roles.filter((r) => !(r.user_id === uid && r.search_id === sel.dataset.accRole));
+    if (sel.value) S.roles.push({ client_id: S.client.id, user_id: uid, search_id: sel.dataset.accRole, access: sel.value });
+    render();
+  }));
+  document.querySelectorAll('[data-fblink]').forEach((b) => (b.onclick = async () => {
+    const c = S.candidates.find((x) => x.id === b.dataset.fblink);
+    const name = prompt('Interviewer name for ' + c.full_name + '?'); if (!name) return;
+    const email = prompt('Interviewer email (optional)') || null;
+    const resume_url = await signResume(c);
+    const { data, error } = await sb.from('feedback_requests').insert({ candidate_id: c.id, interviewer_name: name.trim(), interviewer_email: email ? email.trim().toLowerCase() : null, stage: c.status === 'Final round' ? 'Final round' : 'Client interview', resume_url }).select('token').single();
+    if (error) return toast('Error: ' + error.message);
+    const url = location.origin + '/portal/feedback.html?t=' + data.token;
+    try { await navigator.clipboard.writeText(url); toast('Link copied. Paste it into the interview invite.'); } catch (e) { prompt('Copy this link', url); }
+    loadClient(S.client);
+  }));
+  document.querySelectorAll('[data-copy-link]').forEach((b) => (b.onclick = async () => {
+    const url = location.origin + '/portal/feedback.html?t=' + b.dataset.copyLink;
+    try { await navigator.clipboard.writeText(url); toast('Link copied'); } catch (e) { prompt('Copy this link', url); }
+  }));
   on('notif', async () => { try { await Notification.requestPermission(); } catch (e) {} render(); });
   document.querySelectorAll('[data-sel]').forEach((b) => (b.onclick = () => { S.sel = b.dataset.sel; S.tab = 'inbox'; render(); window.scrollTo(0, 0); }));
   const rp = document.getElementById('reply');

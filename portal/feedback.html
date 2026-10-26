@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Interview Scorecard | Talento Consulting</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="portal.css?v=3.6-102626">
+<!-- Talento Client Portal - interview scorecard link - v1 (102626) -->
+<style>
+  .fbwrap{max-width:760px;margin:0 auto;padding:24px 20px 80px}
+  .fbwrap h1{font-size:clamp(28px,4vw,40px);letter-spacing:-.03em;line-height:1.1;margin:14px 0 6px}
+  .fbwrap .lead{color:#475467;margin:0 0 18px}
+  .fbcard{background:#fff;border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px;margin-bottom:14px}
+  .fbcard h2{margin:0;font-size:20px}
+  .done{text-align:center;padding:48px 20px}
+  .done h2{font-size:26px;margin:0 0 8px}
+</style>
+</head>
+<body>
+<header class="topbar"><div class="topbar-in"><a class="brand" href="/" id="brand"></a><span class="x">×</span><div class="client-chip" id="clientChip"></div></div></header>
+<main class="fbwrap" id="app"><div class="loading">Loading your scorecard…</div></main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js?v=3.6-102626"></script>
+<script>
+const cfg = window.TALENTO_PORTAL;
+const sb = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey, { auth: { persistSession: false } });
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const app = document.getElementById('app');
+const token = new URLSearchParams(location.search).get('t') || '';
+const RECS = ['Strong yes', 'Yes', 'No', 'Strong no'];
+const CRIT = [['skills', 'Skills and experience'], ['fit', 'Fit for the role'], ['comms', 'Communication'], ['drive', 'Motivation']];
+const st = { rec: null, rating: 0, scores: {}, name: '', strengths: '', concerns: '', comment: '' };
+let form = null;
+document.getElementById('brand').innerHTML = `<svg class="brand-mark" viewBox="0 0 40 40" aria-hidden="true"><rect x="4" y="6" width="24" height="7" rx="3.5" fill="#1A5CE8"/><rect x="12.5" y="6" width="7" height="22" rx="3.5" fill="#1A5CE8"/><circle cx="27" cy="29" r="6.5" fill="#E8572A"/></svg><span><span class="brand-word">talento<span>.ai</span></span><span class="brand-sub">CONSULTING</span></span>`;
+
+function when(d) { return d ? new Date(d).toLocaleString('en-US', { weekday: 'long', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : ''; }
+
+function render() {
+  const f = form, c = f.candidate, s = f.search;
+  const dots = (key, val) => `<span class="dots">${[1, 2, 3, 4, 5].map((n) => `<button type="button" class="dot${val >= n ? ' on' : ''}" data-sc="${key}" data-v="${n}" aria-label="${n} of 5">${n}</button>`).join('')}</span>`;
+  app.innerHTML = `
+    <span class="pilltag">${esc(f.client.name)} hiring, run with Talento</span>
+    <h1>Interview scorecard</h1>
+    <p class="lead">Thanks for interviewing ${esc(c.full_name.split(' ')[0])}! Your scorecard goes straight to ${esc(s.hiring_manager || 'the hiring manager')} and Talento. It takes about two minutes.</p>
+    <section class="fbcard">
+      <div class="card-head"><div><h2>${esc(c.full_name)}</h2>
+        <div class="meta">${esc([c.current_title, c.current_company].filter(Boolean).join(' at '))}${c.location ? ' · ' + esc(c.location) : ''}</div>
+        <div class="meta">For: ${esc(s.title)}${s.ref ? ' (' + esc(s.ref) + ')' : ''}${f.interview_at ? ' · Interview ' + esc(when(f.interview_at)) : ''}</div></div>
+        <span class="pill coral">${esc(f.stage || 'Interview')}</span></div>
+      ${c.summary ? `<p class="summary" style="margin:6px 0 0;font-size:14.5px">${esc(c.summary)}</p>` : ''}
+      <div class="links">${f.resume_url ? `<a class="btn btn-sm btn-primary" href="${esc(f.resume_url)}" target="_blank" rel="noopener">Open resume</a>` : ''}${c.linkedin_url ? `<a href="${esc(c.linkedin_url)}" target="_blank" rel="noopener">LinkedIn ↗</a>` : ''}</div>
+    </section>
+    <section class="fbcard">
+      <label class="field"><span>Your name</span><input id="nm" value="${esc(st.name)}" autocomplete="name"></label>
+      <div class="scard" style="border:0;padding:0;background:none">
+        <div class="sc-row"><span class="sc-l">Recommendation</span><span class="seg">${RECS.map((x) => `<button type="button" data-rec="${x}" aria-pressed="${st.rec === x}" class="${st.rec === x ? 'on ' + (/no/i.test(x) ? 'neg' : 'pos') : ''}">${x}</button>`).join('')}</span></div>
+        <div class="sc-row"><span class="sc-l">Overall</span>${dots('overall', st.rating)}</div>
+        ${CRIT.map(([k, l]) => `<div class="sc-row"><span class="sc-l">${l}</span>${dots(k, st.scores[k] || 0)}</div>`).join('')}
+        <label class="note-l"><span>Strengths</span><textarea data-f="strengths" rows="3">${esc(st.strengths)}</textarea></label>
+        <label class="note-l"><span>Concerns</span><textarea data-f="concerns" rows="3">${esc(st.concerns)}</textarea></label>
+        <label class="note-l"><span>Anything else</span><textarea data-f="comment" rows="2">${esc(st.comment)}</textarea></label>
+        <div class="fb-send"><button class="btn btn-primary" id="go">Submit scorecard</button></div>
+      </div>
+    </section>
+    <p class="meta">Questions? Email ${esc(f.client.contact_name || 'Martin')} at <a href="mailto:${esc(f.client.contact_email || 'mw@talentoconsulting.ai')}">${esc(f.client.contact_email || 'mw@talentoconsulting.ai')}</a>.</p>`;
+  document.getElementById('nm').oninput = (e) => { st.name = e.target.value; };
+  app.querySelectorAll('[data-f]').forEach((t) => (t.oninput = () => { st[t.dataset.f] = t.value; }));
+  app.querySelectorAll('[data-rec]').forEach((b) => (b.onclick = () => { st.rec = st.rec === b.dataset.rec ? null : b.dataset.rec; render(); }));
+  app.querySelectorAll('[data-sc]').forEach((b) => (b.onclick = () => { const v = +b.dataset.v; if (b.dataset.sc === 'overall') st.rating = st.rating === v ? 0 : v; else st.scores[b.dataset.sc] = st.scores[b.dataset.sc] === v ? 0 : v; render(); }));
+  document.getElementById('go').onclick = submit;
+}
+
+async function submit(e) {
+  if (!st.rec) return alert('Please pick a recommendation.');
+  e.target.disabled = true; e.target.textContent = 'Sending…';
+  const scores = Object.fromEntries(Object.entries(st.scores).filter(([, v]) => v));
+  const { data, error } = await sb.rpc('submit_feedback_form2', { p_token: token, p_name: st.name, p_recommendation: st.rec, p_rating: st.rating || null,
+    p_scores: Object.keys(scores).length ? scores : null, p_strengths: st.strengths.trim() || null, p_concerns: st.concerns.trim() || null, p_comment: st.comment.trim() || null });
+  if (error || data !== 'OK') { e.target.disabled = false; e.target.textContent = 'Submit scorecard'; return alert(data === 'ALREADY_DONE' ? 'This scorecard has already been submitted.' : 'Sorry, that did not go through. Please try again.'); }
+  app.innerHTML = `<div class="fbcard done"><h2>Thank you!</h2><p class="lead">Your scorecard for ${esc(form.candidate.full_name)} is with ${esc(form.search.hiring_manager || 'the hiring manager')} and Talento.</p></div>`;
+}
+
+(async () => {
+  if (token.length < 32) { app.innerHTML = `<div class="fbcard done"><h2>Link not recognised</h2><p class="lead">Please use the full link from your interview invite.</p></div>`; return; }
+  const { data, error } = await sb.rpc('get_feedback_form2', { p_token: token });
+  if (error || !data) { app.innerHTML = `<div class="fbcard done"><h2>Link not recognised</h2><p class="lead">This link may have been replaced. Please check your latest interview invite.</p></div>`; return; }
+  form = data;
+  document.getElementById('clientChip').textContent = data.client.name;
+  document.documentElement.style.setProperty('--client', data.client.primary_color || '#1A5CE8');
+  document.documentElement.style.setProperty('--client-accent', data.client.accent_color || '#E8572A');
+  if (data.status === 'Completed') { app.innerHTML = `<div class="fbcard done"><h2>Scorecard received</h2><p class="lead">Thanks, your feedback on ${esc(data.candidate.full_name)} is already with Talento.</p></div>`; return; }
+  st.name = data.interviewer_name || '';
+  render();
+})();
+</script>
+</body>
+</html>
