@@ -7,15 +7,15 @@
 <meta name="robots" content="noindex, nofollow">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="portal.css?v=3.3-102626">
-<!-- Talento Client Portal - v3.3 (102626): ATS-fed, live updates, stars, notes and two-way messages -->
+<link rel="stylesheet" href="portal.css?v=3.4-102626">
+<!-- Talento Client Portal - v3.4 (102626): ATS-fed, live updates, stars, notes and two-way messages -->
 </head>
 <body>
 <div id="app"><div class="loading">Loading your portal…</div></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js?v=3.3-102626"></script>
-<script src="common.js?v=3.3-102626"></script>
+<script src="config.js?v=3.4-102626"></script>
+<script src="common.js?v=3.4-102626"></script>
 <script>
 const { sb, esc, fmtDate, ago, initials, BRAND, STAGES, stagePill, statusPill, toast, openFile, applyClientTheme, live, debounce, isTyping, stamp } = TP;
 const app = document.getElementById('app');
@@ -262,6 +262,11 @@ const PSTAGES = [['prospect','Prospects'],['intro','Intro sent'],['applied','LI 
 const PTALLY = { prospect: 1, intro: 1, applied: 1, rejected: 1 };
 const PREJ = { us: 'we passed', client: 'you passed', candidate: 'candidate withdrew', not_now: 'not now' };
 const PLINE = { prospect: 'mapped for this role, not approached yet.', intro: 'approached by email, LinkedIn or phone, no conversation yet.', applied: 'applied through LinkedIn or the advert.', rejected: 'not going ahead.' };
+const PSHOW_KEY = 'talento.portal.stages';
+let pshow = null; try { pshow = JSON.parse(localStorage.getItem(PSHOW_KEY) || 'null'); } catch (e) {}
+if (!Array.isArray(pshow) || !pshow.length) pshow = PSTAGES.map(([k]) => k);
+const savePshow = () => { try { localStorage.setItem(PSHOW_KEY, JSON.stringify(pshow)); } catch (e) {} };
+const stageChips = () => `<div class="pshow"><span class="lbl">Stages to show</span>${PSTAGES.map(([k, l]) => `<button type="button" class="pk" data-pstage="${k}" aria-pressed="${pshow.includes(k)}">${l}</button>`).join('')}<button type="button" class="pk reset" data-pstage="__all">Show all</button></div>`;
 function sinceTxt(iso) { if (!iso) return ''; const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000); return d <= 0 ? 'moved here today' : d === 1 ? 'here 1 day' : 'here ' + d + ' days'; }
 const hmFor = (r) => r.hiring_manager || (state.searches.find((s) => s.ref && s.ref === r.ref) || {}).hiring_manager || '';
 function viewPipeline() {
@@ -276,7 +281,7 @@ function pipeRole(r) {
   let maxN = 0; PSTAGES.forEach(([k]) => { if (!PTALLY[k]) maxN = Math.max(maxN, counts[k] || 0); });
   const strip = PSTAGES.map(([k, l]) => { const n = counts[k] || 0;
     return `<div class="pst ${n ? 'on' : ''}"><b>${n}</b><span>${l}</span>${typeof reach[k] === 'number' ? `<em>${k === 'rejected' ? 'total' : reach[k] + ' ever here'}</em>` : ''}${!PTALLY[k] && n && maxN ? `<i style="width:${Math.round(100 * n / maxN)}%"></i>` : ''}</div>`; }).join('');
-  const cols = PSTAGES.map(([k, l]) => {
+  const cols = PSTAGES.filter(([k]) => pshow.includes(k)).map(([k, l]) => {
     let body = '';
     if (PTALLY[k]) {
       const bits = [];
@@ -295,7 +300,8 @@ function pipeRole(r) {
   return `<article class="prole">
     <div class="prole-h"><h3>${esc(r.title || r.id)}</h3>${r.ref ? `<span class="pref">${esc(r.ref)}</span>` : ''}${hmFor(r) ? `<span class="hm">Hiring manager: <b>${esc(hmFor(r))}</b></span>` : ''}<span class="meta">${[r.location, r.salary].filter(Boolean).map(esc).join(' · ')}</span><span class="meta" style="margin-left:auto">Live from the ATS, ${ago(r.synced)}</span></div>
     <div class="pstrip" style="--n:${PSTAGES.length}">${strip}</div>
-    <div class="pnote">Big number: there now. Ever here: everyone who has been at that stage, including people who moved on or were rejected later.</div>
+    <div class="pnote">Big number: there now. Ever here: everyone who has been at that stage, including people who moved on or were rejected later. Click a name to open their profile.</div>
+    ${stageChips()}
     <div class="pboard">${cols}</div>
   </article>`;
 }
@@ -344,6 +350,7 @@ function viewJob() {
       ${s.summary ? `<p style="margin:0 0 6px;font-size:14px">${esc(s.summary)}</p>` : ''}
       ${s.next_steps ? `<div class="next"><b>Next steps</b>${esc(s.next_steps)}</div>` : ''}
     </div>
+    ${(() => { const r = state.pipeline.find((x) => x.ref && x.ref === s.ref); return r ? `<div style="margin-top:14px">${pipeRole(r)}</div>` : ''; })()}
     ${groups.length ? groups.map(([st, l]) => `<section class="cgroup"><h4>${esc(STATUS_LABEL[st] || st)} <span class="count">${l.length}</span></h4><div class="clist">${l.map(row).join('')}</div></section>`).join('')
       : `<div class="empty" style="margin-top:14px">No candidates on this search yet. They appear here the moment Talento moves them forward.</div>`}
   </div>`;
@@ -448,6 +455,13 @@ function wireBody() {
     const go = () => { state.job = b.dataset.job; state.tab = 'job'; render(); window.scrollTo(0, 0); };
     b.onclick = go; b.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } };
   });
+  document.querySelectorAll('[data-pstage]').forEach((b) => (b.onclick = () => {
+    const k = b.dataset.pstage;
+    if (k === '__all') pshow = PSTAGES.map(([x]) => x);
+    else if (pshow.includes(k)) { if (pshow.length > 1) pshow = pshow.filter((x) => x !== k); }
+    else pshow = PSTAGES.map(([x]) => x).filter((x) => x === k || pshow.includes(x));
+    savePshow(); render();
+  }));
   document.querySelectorAll('[data-back]').forEach((b) => (b.onclick = () => { state.tab = 'overview'; render(); }));
   document.querySelectorAll('[data-cand-open]').forEach((b) => {
     b.onclick = () => openCand(b.dataset.candOpen);
