@@ -7,15 +7,15 @@
 <meta name="robots" content="noindex, nofollow">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="portal.css?v=3.7b-102626">
+<link rel="stylesheet" href="portal.css?v=3.8-102626">
 <!-- Talento Client Portal - v3.6 (102626): ATS-fed, live updates, stars, notes and two-way messages -->
 </head>
 <body>
 <div id="app"><div class="loading">Loading your portal…</div></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js?v=3.7b-102626"></script>
-<script src="common.js?v=3.7b-102626"></script>
+<script src="config.js?v=3.8-102626"></script>
+<script src="common.js?v=3.8-102626"></script>
 <script>
 const { sb, esc, fmtDate, ago, initials, BRAND, STAGES, stagePill, statusPill, toast, openFile, applyClientTheme, live, debounce, isTyping, stamp } = TP;
 const app = document.getElementById('app');
@@ -40,29 +40,37 @@ function authShell(inner) {
   </div>`;
 }
 
-function showLogin(msg, kind = 'err') {
+function showLogin(msg, kind = 'err', pre = '') {
+  const qe = pre || new URLSearchParams(location.search).get('email') || '';
   app.innerHTML = authShell(`
     <h2>Client sign in</h2>
-    <p class="sub">Welcome back. Sign in to see your searches.</p>
+    <p class="sub">Enter your work email and we'll send you a secure sign-in link. No password needed.</p>
     ${msg ? `<div class="msg ${kind}">${esc(msg)}</div>` : ''}
     <form id="f">
-      <label class="field"><span>Work email</span><input type="email" id="email" autocomplete="email" required></label>
-      <label class="field"><span>Password</span><input type="password" id="pw" autocomplete="current-password" required></label>
-      <button class="btn btn-primary" style="width:100%" id="go">Sign in</button>
+      <label class="field"><span>Work email</span><input type="email" id="email" autocomplete="email" required value="${esc(qe)}"></label>
+      <button class="btn btn-primary" style="width:100%" id="magic">Email me a sign-in link</button>
+      <div class="orline"><span>or use a password</span></div>
+      <label class="field"><span>Password</span><input type="password" id="pw" autocomplete="current-password"></label>
+      <button type="button" class="btn btn-ghost" style="width:100%" id="go">Sign in with password</button>
       <div class="row"><button type="button" class="btn-link" id="forgot">Forgot password?</button><a class="meta" href="/">Back to site</a></div>
-      <div class="orline"><span>or</span></div>
-      <button type="button" class="btn btn-ghost" style="width:100%" id="magic">Email me a sign-in link</button>
     </form>`);
-  document.getElementById('magic').onclick = async () => {
-    const em = email.value.trim(); if (!em) return showLogin('Enter your work email first, then tap the sign-in link button.');
-    const { error } = await sb.auth.signInWithOtp({ email: em, options: { shouldCreateUser: false, emailRedirectTo: location.origin + location.pathname } });
-    showLogin(error ? 'We could not find a portal login for that email. Ask Talento to add you.' : 'Check your inbox for your sign-in link.', error ? 'err' : 'ok');
-  };
+  const emailEl = document.getElementById('email');
   document.getElementById('f').onsubmit = async (e) => {
     e.preventDefault();
-    const b = document.getElementById('go'); b.disabled = true; b.textContent = 'Signing in…';
-    const { error } = await sb.auth.signInWithPassword({ email: email.value.trim(), password: pw.value });
-    if (error) return showLogin(error.message === 'Invalid login credentials' ? 'That email and password don’t match. Try again or reset your password.' : error.message);
+    const em = emailEl.value.trim().toLowerCase(); if (!em) return;
+    const b = document.getElementById('magic'); b.disabled = true; b.textContent = 'Sending…';
+    let join = false;
+    try { const r = await sb.rpc('portal_can_join', { p_email: em }); join = r.data === true; } catch (_) {}
+    const { error } = await sb.auth.signInWithOtp({ email: em, options: { shouldCreateUser: join, emailRedirectTo: location.origin + location.pathname } });
+    if (error) return showLogin(/rate|seconds/i.test(error.message) ? 'We just sent you a link. Please give it a minute, then try again.' : 'We could not find portal access for ' + em + ' yet. If you have just been added, try again shortly, or email mw@talentoconsulting.ai.', 'err', em);
+    showLogin('Check your inbox: your sign-in link for the Talento client portal is on its way from Talento Consulting.', 'ok', em);
+  };
+  document.getElementById('go').onclick = async () => {
+    const b = document.getElementById('go'); const pw = document.getElementById('pw').value;
+    if (!emailEl.value.trim() || !pw) return showLogin('Enter your email and password, or use the sign-in link.', 'err', emailEl.value.trim());
+    b.disabled = true; b.textContent = 'Signing in…';
+    const { error } = await sb.auth.signInWithPassword({ email: emailEl.value.trim(), password: pw });
+    if (error) return showLogin(error.message === 'Invalid login credentials' ? 'That email and password don\u2019t match. Try the sign-in link instead.' : error.message, 'err', emailEl.value.trim());
     boot();
   };
   document.getElementById('forgot').onclick = showForgot;
