@@ -273,3 +273,20 @@ table.docs{width:100%;border-collapse:collapse;background:#fff;border:1px solid 
 .pk{border:1px solid var(--border);background:#fff;border-radius:999px;padding:4px 11px;font-size:12.5px;font-weight:600;color:#4b5563}
 .pk[aria-pressed="true"]{background:var(--client);border-color:var(--client);color:#fff}
 .pk.reset{border-style:dashed}
+/* v3.5: click any stage, search within a job */
+.pst.click,.pcol-h.click{cursor:pointer}
+.pst.click:hover{background:#fff}
+.pst.sel{background:#fff;box-shadow:inset 0 -3px 0 var(--client)}
+.pcol-h.click:hover h4{color:var(--client)}
+.see-all{display:block;margin-top:8px;font-size:12.5px}
+.jsearch{display:flex;align-items:center;gap:12px;margin-top:14px}
+.jsearch input{flex:1;padding:11px 14px;border:1px solid var(--border);border-radius:12px;background:#fff;font-size:15px;outline:none}
+.jsearch input:focus{border-color:var(--client);box-shadow:0 0 0 3px rgba(26,92,232,.15)}
+.pk .n{opacity:.7;font-weight:500;margin-left:2px}
+.pill.stage-prospect,.pill.stage-intro,.pill.stage-applied{background:#eef2f7;color:#475467}
+.pill.stage-screening{background:#e6eefd;color:var(--blue)}
+.pill.stage-hm_review,.pill.stage-hm_interview{background:#fdece6;color:#c2410c}
+.pill.stage-stage2,.pill.stage-onsite,.pill.stage-final{background:#f4f3ff;color:#6d28d9}
+.pill.stage-offer{background:#fdf3dc;color:#b45309}
+.pill.stage-placed{background:#e3f5ea;color:#15803d}
+.pill.stage-rejected{background:#eeeeee;color:#555}

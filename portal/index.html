@@ -7,19 +7,19 @@
 <meta name="robots" content="noindex, nofollow">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="portal.css?v=3.4-102626">
-<!-- Talento Client Portal - v3.4 (102626): ATS-fed, live updates, stars, notes and two-way messages -->
+<link rel="stylesheet" href="portal.css?v=3.5-102626">
+<!-- Talento Client Portal - v3.5 (102626): ATS-fed, live updates, stars, notes and two-way messages -->
 </head>
 <body>
 <div id="app"><div class="loading">Loading your portal…</div></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js?v=3.4-102626"></script>
-<script src="common.js?v=3.4-102626"></script>
+<script src="config.js?v=3.5-102626"></script>
+<script src="common.js?v=3.5-102626"></script>
 <script>
 const { sb, esc, fmtDate, ago, initials, BRAND, STAGES, stagePill, statusPill, toast, openFile, applyClientTheme, live, debounce, isTyping, stamp } = TP;
 const app = document.getElementById('app');
-let state = { user: null, isAdmin: false, clients: [], client: null, member: null, searches: [], candidates: [], docs: [], feedback: [], pipeline: [], messages: [], marks: [], activity: [], role: 'all', tab: 'pipeline', filter: 'all', drafts: {}, msgDrafts: {}, noteDrafts: {}, open: {}, live: false, pending: false };
+let state = { user: null, isAdmin: false, clients: [], client: null, member: null, searches: [], candidates: [], docs: [], feedback: [], pipeline: [], messages: [], marks: [], activity: [], role: 'all', tab: 'pipeline', filter: 'all', drafts: {}, msgDrafts: {}, noteDrafts: {}, open: {}, live: false, pending: false, people: [], jobStage: 'all', jobQ: '', jobLimit: 150, person: null };
 const SEEN_KEY = 'talento.portal.seen';
 let seen = {}; try { seen = JSON.parse(localStorage.getItem(SEEN_KEY) || '{}'); } catch (e) {}
 const saveSeen = () => { try { localStorage.setItem(SEEN_KEY, JSON.stringify(seen)); } catch (e) {} };
@@ -122,6 +122,14 @@ async function fetchClient(id) {
   state.pipeline = (p.data || []).map((x) => Object.assign({ id: x.job_id, synced: x.updated_at }, x.doc || {}));
   state.searches = s.data || []; state.candidates = c.data || []; state.docs = d.data || []; state.feedback = f.data || []; state.member = m.data;
   state.messages = msg.data || []; state.marks = mk.data || []; state.activity = act.data || [];
+  state.people = [];
+  if (state.isAdmin) {
+    for (let from = 0; from < 20000; from += 1000) {
+      const { data } = await sb.from('ats_people').select('job_id,ref,ats_id,name,title,company,location,stage,stage_at').eq('client_id', id).range(from, from + 999);
+      state.people.push(...(data || []));
+      if (!data || data.length < 1000) break;
+    }
+  }
 }
 
 async function loadClient(client) {
@@ -239,7 +247,7 @@ function render() {
       </div>
     </section>
   </main>
-  ${drawer()}`;
+  ${drawer()}${state.person && !state.cand ? personDrawer() : ''}`;
 
   document.getElementById('out').onclick = signOut;
   const mb = document.getElementById('mailBtn'), mm = document.getElementById('mailMenu');
@@ -250,7 +258,7 @@ function render() {
     try { await navigator.clipboard.writeText(addr); toast('Email address copied'); } catch (e) { toast(addr); }
     mm.classList.add('hidden');
   };
-  document.querySelectorAll('.tab').forEach((t) => (t.onclick = () => { state.tab = t.dataset.tab; render(); }));
+  document.querySelectorAll('.tab').forEach((t) => (t.onclick = () => { state.tab = t.dataset.tab; state.jobQ = ''; state.jobStage = 'all'; render(); }));
   const cs = document.getElementById('clientSel');
   if (cs) cs.onchange = () => { const c = state.clients.find((x) => x.slug === cs.value); history.replaceState(null, '', '?client=' + c.slug); state.tab = 'overview'; state.filter = 'all'; loadClient(c); };
   wireBody();
@@ -279,8 +287,9 @@ function viewPipeline() {
 function pipeRole(r) {
   const counts = r.counts || {}, reach = r.reached || {}, lab = Object.fromEntries(PSTAGES);
   let maxN = 0; PSTAGES.forEach(([k]) => { if (!PTALLY[k]) maxN = Math.max(maxN, counts[k] || 0); });
+  const qf = (p) => matchQ([p.name, p.title, p.company, p.where]);
   const strip = PSTAGES.map(([k, l]) => { const n = counts[k] || 0;
-    return `<div class="pst ${n ? 'on' : ''}"><b>${n}</b><span>${l}</span>${typeof reach[k] === 'number' ? `<em>${k === 'rejected' ? 'total' : reach[k] + ' ever here'}</em>` : ''}${!PTALLY[k] && n && maxN ? `<i style="width:${Math.round(100 * n / maxN)}%"></i>` : ''}</div>`; }).join('');
+    return `<div class="pst ${n ? 'on' : ''} click${state.tab === 'job' && state.jobStage === k ? ' sel' : ''}" data-open-stage="${k}" data-ref="${esc(r.ref || '')}" role="button" tabindex="0" title="See everyone at ${esc(l)}"><b>${n}</b><span>${l}</span>${typeof reach[k] === 'number' ? `<em>${k === 'rejected' ? 'total' : reach[k] + ' ever here'}</em>` : ''}${!PTALLY[k] && n && maxN ? `<i style="width:${Math.round(100 * n / maxN)}%"></i>` : ''}</div>`; }).join('');
   const cols = PSTAGES.filter(([k]) => pshow.includes(k)).map(([k, l]) => {
     let body = '';
     if (PTALLY[k]) {
@@ -289,18 +298,18 @@ function pipeRole(r) {
       if (k === 'intro' && r.intro_detail) { const d = r.intro_detail; bits.push(`Emails ${d.emails || 0}, bounced ${d.bounced || 0}. LinkedIn invites ${d.li_invites || 0}, accepted ${d.accepted || 0}. Replied ${d.replied || 0}.`); }
       if (k === 'rejected' && r.rejected_at) { const parts = Object.keys(r.rejected_at).sort((a, b) => r.rejected_at[b] - r.rejected_at[a]).map((x) => r.rejected_at[x] + ' after ' + (lab[x] || x)); if (parts.length) bits.push('Furthest stage reached: ' + parts.join(', ') + '.');
         const by = r.rejected_by || {}, bp = Object.keys(by).filter((x) => PREJ[x]).map((x) => by[x] + ' ' + PREJ[x]); if (bp.length) bits.push('Why: ' + bp.join(', ') + '.'); }
-      if (k !== 'rejected') bits.push('Names show from Screening on.');
-      body = `<div class="ptally"><b>${counts[k] || 0}</b>${PLINE[k]}${bits.map((b) => `<div class="w">${esc(b)}</div>`).join('')}</div>`;
+      if (k !== 'rejected' && !state.isAdmin) bits.push('Names show from Screening on.');
+      body = `<div class="ptally"><b>${counts[k] || 0}</b>${PLINE[k]}${bits.map((b) => `<div class="w">${esc(b)}</div>`).join('')}${state.isAdmin && counts[k] ? `<button class="btn-link see-all" data-open-stage="${k}" data-ref="${esc(r.ref || '')}">See all ${counts[k]} →</button>` : ''}</div>`;
     } else {
-      const here = (r.candidates || []).filter((p) => p.stage === k);
+      const here = (r.candidates || []).filter((p) => p.stage === k && qf(p));
       body = here.length ? here.map((p) => `<div class="pcard${candByAts(p.id) ? ' click' : ''}"${candByAts(p.id) ? ` data-cand-open="${candByAts(p.id).id}" role="button" tabindex="0"` : ''}><div class="nm">${esc(p.name || 'Candidate')}</div>${[p.title, p.company].filter(Boolean).length ? `<div class="sub">${esc([p.title, p.company].filter(Boolean).join(' · '))}</div>` : ''}${p.where ? `<div class="loc">${esc(p.where)}</div>` : ''}<div class="since">${sinceTxt(p.at)}</div>${p.pack ? `<a class="plink" href="${esc(p.pack)}" target="_blank" rel="noopener">Profile and resume</a>` : ''}</div>`).join('') : `<div class="pempty">Nobody here yet</div>`;
     }
-    return `<div class="pcol"><div class="pcol-h"><h4>${l}</h4><span>${counts[k] || 0}</span></div>${body}</div>`;
+    return `<div class="pcol"><div class="pcol-h click" data-open-stage="${k}" data-ref="${esc(r.ref || '')}" role="button" tabindex="0"><h4>${l}</h4><span>${counts[k] || 0}</span></div>${body}</div>`;
   }).join('');
   return `<article class="prole">
     <div class="prole-h"><h3>${esc(r.title || r.id)}</h3>${r.ref ? `<span class="pref">${esc(r.ref)}</span>` : ''}${hmFor(r) ? `<span class="hm">Hiring manager: <b>${esc(hmFor(r))}</b></span>` : ''}<span class="meta">${[r.location, r.salary].filter(Boolean).map(esc).join(' · ')}</span><span class="meta" style="margin-left:auto">Live from the ATS, ${ago(r.synced)}</span></div>
     <div class="pstrip" style="--n:${PSTAGES.length}">${strip}</div>
-    <div class="pnote">Big number: there now. Ever here: everyone who has been at that stage, including people who moved on or were rejected later. Click a name to open their profile.</div>
+    <div class="pnote">Big number: there now. Ever here: everyone who has been at that stage, including people who moved on or were rejected later. Click a stage to see everyone in it, or a name to open their profile.</div>
     ${stageChips()}
     <div class="pboard">${cols}</div>
   </article>`;
@@ -328,19 +337,46 @@ function viewSearches() {
 const candByAts = (id) => id && state.candidates.find((c) => c.ats_id === id);
 const STATUS_ORDER = ['Offer', 'Final round', 'Client interview', 'Presented', 'Screening', 'On hold', 'Hired', 'Declined', 'Withdrawn'];
 const STATUS_LABEL = { Screening: 'Talento screening (only you see these)', Presented: 'Presented, awaiting your review' };
+const PLABEL = Object.fromEntries(PSTAGES);
+const STATUS_STAGE = { Screening: 'screening', Presented: 'hm_review', 'On hold': 'hm_review', 'Client interview': 'hm_interview', 'Final round': 'final', Offer: 'offer', Hired: 'placed', Declined: 'rejected', Withdrawn: 'rejected' };
+function matchQ(fields) {
+  const q = (state.jobQ || '').trim().toLowerCase();
+  if (!q) return true;
+  const hay = fields.filter(Boolean).join(' ').toLowerCase();
+  return q.split(/\s+/).every((t) => hay.includes(t));
+}
+function jobRows(s) {
+  const mine = state.candidates.filter((c) => c.search_id === s.id);
+  const byAts = new Map(mine.filter((c) => c.ats_id).map((c) => [c.ats_id, c]));
+  const rows = state.people.filter((p) => s.ref && p.ref === s.ref).map((p) => ({ key: 'p:' + p.ats_id, name: p.name, title: p.title, company: p.company, location: p.location, stage: p.stage, at: p.stage_at, cand: byAts.get(p.ats_id) }));
+  const have = new Set(rows.map((r) => r.cand && r.cand.id).filter(Boolean));
+  const keys = new Set(state.people.filter((p) => p.ref === s.ref).map((p) => p.ats_id));
+  mine.forEach((c) => { if (!have.has(c.id) && !(c.ats_id && keys.has(c.ats_id))) rows.push({ key: 'c:' + c.id, name: c.full_name, title: c.current_title, company: c.current_company, location: c.location, stage: c.ats_stage || STATUS_STAGE[c.status] || 'hm_review', at: c.updated_at, cand: c }); });
+  const pr = state.pipeline.find((x) => x.ref && x.ref === s.ref);
+  if (pr) (pr.candidates || []).forEach((p) => { if (!keys.has(p.id) && !mine.some((c) => c.ats_id === p.id)) rows.push({ key: 'd:' + p.id, name: p.name, title: p.title, company: p.company, location: p.where, stage: p.stage, at: p.at, cand: null }); });
+  return rows;
+}
 function viewJob() {
   const s = state.searches.find((x) => x.id === state.job);
   if (!s) { state.tab = 'overview'; return viewSearches(); }
-  const list = state.candidates.filter((c) => c.search_id === s.id);
-  const groups = STATUS_ORDER.map((st) => [st, list.filter((c) => c.status === st)]).filter(([, l]) => l.length);
-  const row = (c) => {
-    const msgs = threadOf(c.id).length, n = unread(c.id), stars = state.marks.filter((m) => m.candidate_id === c.id && m.starred).length;
-    return `<button class="crow" data-cand-open="${c.id}">
-      <span class="avatar sm" style="background:var(--client)">${esc(initials(c.full_name))}</span>
-      <span class="crow-main"><b>${esc(c.full_name)}</b><span class="meta">${esc([c.current_title, c.current_company].filter(Boolean).join(' at '))}${c.location ? ' · ' + esc(c.location) : ''}</span></span>
-      <span class="crow-side">${c.resume_path ? '<span class="tag">Resume</span>' : ''}${stars ? `<span class="tag star-t">★ ${stars}</span>` : ''}${msgs ? `<span class="tag">💬 ${msgs}</span>` : ''}${n ? `<span class="badge">${n} new</span>` : ''}${statusPill(c.status)}</span>
+  const all = jobRows(s);
+  const found = all.filter((r) => matchQ([r.name, r.title, r.company, r.location]));
+  const counts = {}; found.forEach((r) => { counts[r.stage] = (counts[r.stage] || 0) + 1; });
+  const order = Object.fromEntries(PSTAGES.map(([k], i) => [k, i]));
+  const list = found.filter((r) => state.jobStage === 'all' || r.stage === state.jobStage)
+    .sort((a, b) => (order[b.stage] ?? -1) - (order[a.stage] ?? -1) || String(b.at || '').localeCompare(String(a.at || '')));
+  const shown = list.slice(0, state.jobLimit);
+  const row = (r) => {
+    const c = r.cand, msgs = c ? threadOf(c.id).length : 0, n = c ? unread(c.id) : 0, stars = c ? state.marks.filter((m) => m.candidate_id === c.id && m.starred).length : 0;
+    const attrs = c ? `data-cand-open="${c.id}"` : `data-person-open="${esc(r.key)}"`;
+    return `<button class="crow" ${attrs}>
+      <span class="avatar sm" style="background:${c ? 'var(--client)' : '#94a3b8'}">${esc(initials(r.name))}</span>
+      <span class="crow-main"><b>${esc(r.name || 'Candidate')}</b><span class="meta">${esc([r.title, r.company].filter(Boolean).join(' at '))}${r.location ? ' · ' + esc(r.location) : ''}</span></span>
+      <span class="crow-side">${c && c.resume_path ? '<span class="tag">Resume</span>' : ''}${stars ? `<span class="tag star-t">★ ${stars}</span>` : ''}${msgs ? `<span class="tag">💬 ${msgs}</span>` : ''}${n ? `<span class="badge">${n} new</span>` : ''}<span class="pill stage-${esc(r.stage)}">${esc(PLABEL[r.stage] || r.stage)}</span></span>
     </button>`;
   };
+  const chip = (k, l, n) => `<button type="button" class="pk" data-job-stage="${k}" aria-pressed="${state.jobStage === k}">${esc(l)} <span class="n">${n}</span></button>`;
+  const pr = state.pipeline.find((x) => x.ref && x.ref === s.ref);
   return `<div class="jobview">
     <button class="btn-link" data-back>← All searches</button>
     <div class="card" style="margin-top:10px">
@@ -350,10 +386,36 @@ function viewJob() {
       ${s.summary ? `<p style="margin:0 0 6px;font-size:14px">${esc(s.summary)}</p>` : ''}
       ${s.next_steps ? `<div class="next"><b>Next steps</b>${esc(s.next_steps)}</div>` : ''}
     </div>
-    ${(() => { const r = state.pipeline.find((x) => x.ref && x.ref === s.ref); return r ? `<div style="margin-top:14px">${pipeRole(r)}</div>` : ''; })()}
-    ${groups.length ? groups.map(([st, l]) => `<section class="cgroup"><h4>${esc(STATUS_LABEL[st] || st)} <span class="count">${l.length}</span></h4><div class="clist">${l.map(row).join('')}</div></section>`).join('')
-      : `<div class="empty" style="margin-top:14px">No candidates on this search yet. They appear here the moment Talento moves them forward.</div>`}
+    <div class="jsearch"><input id="jobq" type="search" placeholder="Search this job by name, company, job title or location" value="${esc(state.jobQ)}" aria-label="Search candidates in this job" autocomplete="off">${state.jobQ ? `<span class="meta">${found.length} match${found.length === 1 ? '' : 'es'}</span>` : ''}</div>
+    ${pr ? `<div style="margin-top:12px">${pipeRole(pr)}</div>` : ''}
+    <section class="cgroup" id="stagelist">
+      <h4>${state.jobStage === 'all' ? 'Everyone on this search' : esc(PLABEL[state.jobStage] || state.jobStage)} <span class="count">${list.length}</span></h4>
+      <div class="pshow" style="padding:0 0 10px">${chip('all', 'All stages', found.length)}${PSTAGES.filter(([k]) => counts[k]).map(([k, l]) => chip(k, l, counts[k])).join('')}</div>
+      ${shown.length ? `<div class="clist">${shown.map(row).join('')}</div>${list.length > shown.length ? `<button class="btn btn-sm btn-ghost" data-more style="margin-top:10px">Show ${Math.min(150, list.length - shown.length)} more of ${list.length - shown.length}</button>` : ''}`
+        : `<div class="empty">${state.jobQ ? 'Nobody matches that search at this stage.' : (state.isAdmin ? 'Nobody at this stage yet.' : 'Names show here from Screening on. Talento will move people forward as they qualify.')}</div>`}
+    </section>
   </div>`;
+}
+function personDrawer() {
+  const s = state.searches.find((x) => x.id === state.job);
+  const r = s && jobRows(s).find((x) => x.key === state.person);
+  if (!r) return '';
+  return `<div class="drawer-ov" data-close-drawer><aside class="drawer" role="dialog" aria-label="${esc(r.name)}">
+    <button class="drawer-x" data-close-drawer aria-label="Close">×</button>
+    <article class="card"><div class="cand"><div class="avatar" style="background:#94a3b8">${esc(initials(r.name))}</div><div>
+      <div class="card-head" style="margin:0"><div><h3>${esc(r.name || 'Candidate')}</h3>
+        <div class="meta">${esc([r.title, r.company].filter(Boolean).join(' at '))}${r.location ? ' · ' + esc(r.location) : ''}</div>
+        <div class="meta">For: ${esc(s.title)}${s.ref ? ' (' + esc(s.ref) + ')' : ''}${r.at ? ' · in this stage since ' + fmtDate(r.at) : ''}</div></div>
+        <span class="pill">${esc(PLABEL[r.stage] || r.stage)}</span></div>
+      <p class="summary meta">${state.isAdmin ? 'Not presented to the client yet. Their full record, contact details and history live in the ATS.' : 'Talento is working with this candidate. Their profile opens here once they are presented to you.'}</p>
+    </div></div></article>
+  </aside></div>`;
+}
+function goStage(k, ref) {
+  const s = ref ? state.searches.find((x) => x.ref === ref) : state.searches.find((x) => x.id === state.job);
+  if (s) state.job = s.id;
+  state.tab = 'job'; state.jobStage = k; state.jobLimit = 150; render();
+  document.getElementById('stagelist')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 function drawer() {
   const c = state.cand && state.candidates.find((x) => x.id === state.cand);
@@ -452,7 +514,7 @@ function viewDocs() {
 function wireBody() {
   document.querySelectorAll('[data-role]').forEach((b) => (b.onclick = () => { state.role = b.dataset.role; render(); }));
   document.querySelectorAll('[data-job]').forEach((b) => {
-    const go = () => { state.job = b.dataset.job; state.tab = 'job'; render(); window.scrollTo(0, 0); };
+    const go = () => { state.job = b.dataset.job; state.tab = 'job'; state.jobStage = 'all'; state.jobQ = ''; state.jobLimit = 150; render(); window.scrollTo(0, 0); };
     b.onclick = go; b.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } };
   });
   document.querySelectorAll('[data-pstage]').forEach((b) => (b.onclick = () => {
@@ -462,12 +524,27 @@ function wireBody() {
     else pshow = PSTAGES.map(([x]) => x).filter((x) => x === k || pshow.includes(x));
     savePshow(); render();
   }));
-  document.querySelectorAll('[data-back]').forEach((b) => (b.onclick = () => { state.tab = 'overview'; render(); }));
+  document.querySelectorAll('[data-back]').forEach((b) => (b.onclick = () => { state.tab = 'overview'; state.jobQ = ''; state.jobStage = 'all'; render(); }));
+  document.querySelectorAll('[data-open-stage]').forEach((b) => {
+    const go = (e) => { e.stopPropagation(); goStage(b.dataset.openStage, b.dataset.ref); };
+    b.onclick = go; b.onkeydown = (e) => { if (e.key === 'Enter') go(e); };
+  });
+  document.querySelectorAll('[data-job-stage]').forEach((b) => (b.onclick = () => { state.jobStage = b.dataset.jobStage; state.jobLimit = 150; render(); document.getElementById('stagelist')?.scrollIntoView({ block: 'start' }); }));
+  document.querySelectorAll('[data-more]').forEach((b) => (b.onclick = () => { state.jobLimit += 150; render(); }));
+  document.querySelectorAll('[data-person-open]').forEach((b) => (b.onclick = () => { state.person = b.dataset.personOpen; render(); }));
+  const jq = document.getElementById('jobq');
+  if (jq) {
+    jq.oninput = () => {
+      state.jobQ = jq.value; state.jobLimit = 150;
+      const pos = jq.selectionStart; render();
+      const n = document.getElementById('jobq'); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (e) {} }
+    };
+  }
   document.querySelectorAll('[data-cand-open]').forEach((b) => {
     b.onclick = () => openCand(b.dataset.candOpen);
     b.onkeydown = (e) => { if (e.key === 'Enter') openCand(b.dataset.candOpen); };
   });
-  document.querySelectorAll('[data-close-drawer]').forEach((b) => (b.onclick = (e) => { if (e.target === b) { state.cand = null; render(); } }));
+  document.querySelectorAll('[data-close-drawer]').forEach((b) => (b.onclick = (e) => { if (e.target === b) { state.cand = null; state.person = null; render(); } }));
   const flt = document.getElementById('flt');
   if (flt) flt.onchange = () => { state.filter = flt.value; render(); };
   document.querySelectorAll('[data-file]').forEach((b) => (b.onclick = () => openFile(b.dataset.file)));
@@ -543,7 +620,7 @@ function markSeen(cid) {
   if (last) { seen[state.user.id + ':' + cid] = last; saveSeen(); }
 }
 
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && state.cand) { state.cand = null; render(); } });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && (state.cand || state.person)) { state.cand = null; state.person = null; render(); } });
 sb.auth.onAuthStateChange((event) => { if (event === 'PASSWORD_RECOVERY') { needPassword = true; showSetPassword(); } });
 boot();
 </script>
