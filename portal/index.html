@@ -7,15 +7,15 @@
 <meta name="robots" content="noindex, nofollow">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="portal.css?v=3.6-102626">
+<link rel="stylesheet" href="portal.css?v=3.7-102626">
 <!-- Talento Client Portal - v3.6 (102626): ATS-fed, live updates, stars, notes and two-way messages -->
 </head>
 <body>
 <div id="app"><div class="loading">Loading your portal…</div></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js?v=3.6-102626"></script>
-<script src="common.js?v=3.6-102626"></script>
+<script src="config.js?v=3.7-102626"></script>
+<script src="common.js?v=3.7-102626"></script>
 <script>
 const { sb, esc, fmtDate, ago, initials, BRAND, STAGES, stagePill, statusPill, toast, openFile, applyClientTheme, live, debounce, isTyping, stamp } = TP;
 const app = document.getElementById('app');
@@ -50,7 +50,14 @@ function showLogin(msg, kind = 'err') {
       <label class="field"><span>Password</span><input type="password" id="pw" autocomplete="current-password" required></label>
       <button class="btn btn-primary" style="width:100%" id="go">Sign in</button>
       <div class="row"><button type="button" class="btn-link" id="forgot">Forgot password?</button><a class="meta" href="/">Back to site</a></div>
+      <div class="orline"><span>or</span></div>
+      <button type="button" class="btn btn-ghost" style="width:100%" id="magic">Email me a sign-in link</button>
     </form>`);
+  document.getElementById('magic').onclick = async () => {
+    const em = email.value.trim(); if (!em) return showLogin('Enter your work email first, then tap the sign-in link button.');
+    const { error } = await sb.auth.signInWithOtp({ email: em, options: { shouldCreateUser: false, emailRedirectTo: location.origin + location.pathname } });
+    showLogin(error ? 'We could not find a portal login for that email. Ask Talento to add you.' : 'Check your inbox for your sign-in link.', error ? 'err' : 'ok');
+  };
   document.getElementById('f').onsubmit = async (e) => {
     e.preventDefault();
     const b = document.getElementById('go'); b.disabled = true; b.textContent = 'Signing in…';

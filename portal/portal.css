@@ -320,3 +320,7 @@ table.docs{width:100%;border-collapse:collapse;background:#fff;border:1px solid 
 .acc-h{display:flex;justify-content:space-between;gap:10px;align-items:baseline;margin-bottom:6px}
 .ck{display:inline-flex;gap:6px;align-items:center;margin:2px 12px 2px 0;font-size:13px}
 .ck input{width:auto}
+.orline{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12px;margin:14px 0 10px}
+.orline::before,.orline::after{content:"";flex:1;height:1px;background:var(--border)}
+.ckgrid{display:flex;flex-wrap:wrap;gap:4px 6px;padding:6px 0}
+.ckgrid .ck{border:1px solid var(--border);border-radius:999px;padding:5px 11px;background:#fff;margin:0}

@@ -7,22 +7,22 @@
 <meta name="robots" content="noindex, nofollow">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="portal.css?v=3.6-102626">
+<link rel="stylesheet" href="portal.css?v=3.7-102626">
 <!-- Talento Client Portal Admin - v3 (102626): live inbox, two-way messages, client stars and notes -->
 </head>
 <body>
 <div id="app"><div class="loading">Loading admin…</div></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js?v=3.6-102626"></script>
-<script src="common.js?v=3.6-102626"></script>
+<script src="config.js?v=3.7-102626"></script>
+<script src="common.js?v=3.7-102626"></script>
 <script>
 const { sb, cfg, esc, fmtDate, ago, safeName, BRAND, STAGES, stagePill, statusPill, toast, openFile, live, debounce, isTyping, stamp } = TP;
 const app = document.getElementById('app');
 const STAGE_ALL = [...STAGES, 'On hold', 'Closed'];
 const STATUS_ALL = ['Presented', 'Client interview', 'Final round', 'Offer', 'Hired', 'On hold', 'Declined', 'Withdrawn'];
 const DOC_CATS = ['Job spec', 'Proposal', 'Market map', 'IQS report', 'Contract', 'General'];
-let S = { roles: [], mc: [], requests: [], clients: [], client: null, members: [], searches: [], candidates: [], docs: [], feedback: [], messages: [], marks: [], activity: [], tab: 'inbox', sel: null, drafts: {}, live: false, pending: false, unseen: 0 };
+let S = { contacts: [], editContact: null, roles: [], mc: [], requests: [], clients: [], client: null, members: [], searches: [], candidates: [], docs: [], feedback: [], messages: [], marks: [], activity: [], tab: 'inbox', sel: null, drafts: {}, live: false, pending: false, unseen: 0 };
 
 const opt = (list, v) => list.map((x) => `<option ${x === v ? 'selected' : ''}>${esc(x)}</option>`).join('');
 const val = (id) => document.getElementById(id)?.value.trim() || null;
@@ -63,6 +63,8 @@ async function fetchClient(c) {
   ]);
   S.members = m.data || []; S.searches = s.data || []; S.candidates = ca.data || []; S.docs = d.data || []; S.feedback = f.data || [];
   S.messages = msg.data || []; S.marks = mk.data || []; S.activity = act.data || [];
+  const { data: ct } = await sb.from('client_contacts').select('*').eq('client_id', c.id).order('full_name');
+  S.contacts = ct || [];
   const [mr, mc, fr] = await Promise.all([
     sb.from('member_roles').select('*').eq('client_id', c.id),
     sb.from('member_candidates').select('*').eq('client_id', c.id),
@@ -146,7 +148,7 @@ function clientPanel(c) {
   return `
   <div class="hero" style="margin-bottom:12px"><div><div class="eyebrow">Client</div><h1 style="font-size:30px">${esc(c.name)}</h1>
     <p class="meta">Portal link: ${esc(location.origin)}/portal/?client=${esc(c.slug)}</p></div></div>
-  <nav class="tabs">${t('inbox', 'Live inbox' + (unanswered() ? ' (' + unanswered() + ')' : ''))}${t('searches', 'Searches')}${t('candidates', 'Candidates')}${t('documents', 'Documents')}${t('feedback', 'Feedback (' + S.feedback.length + ')')}${t('people', 'Client logins')}${t('settings', 'Branding')}</nav>
+  <nav class="tabs">${t('inbox', 'Live inbox' + (unanswered() ? ' (' + unanswered() + ')' : ''))}${t('searches', 'Searches')}${t('candidates', 'Candidates')}${t('documents', 'Documents')}${t('feedback', 'Feedback (' + S.feedback.length + ')')}${t('people', 'Contacts and logins')}${t('settings', 'Branding')}</nav>
   ${({ inbox: tabInbox, searches: tabSearches, candidates: tabCands, documents: tabDocs, feedback: tabFeedback, people: tabPeople, settings: tabSettings })[S.tab]()}`;
 }
 
@@ -268,23 +270,39 @@ function tabFeedback() {
 
 /* ---- People ---- */
 function tabPeople() {
-  return `<div class="section card"><h2>Give someone access</h2>
-    <div class="note"><b>Step 1.</b> In Supabase go to Authentication → Users → Add user → <b>Send invitation</b> and enter their email.<br>
-    <b>Step 2.</b> Link that email to ${esc(S.client.name)} below. They’ll get the invite, set a password and land straight in this portal.</div>
+  const e = S.editContact || {};
+  const acc = e.access || 'hm';
+  const sel = new Set(e.search_ids || []);
+  const csel = new Set(e.candidate_ids || []);
+  const refs = (ids) => S.searches.filter((x) => (ids || []).includes(x.id)).map((x) => x.ref || x.title).join(', ');
+  const status = (k) => {
+    const m = S.members.find((x) => k.user_id && x.user_id === k.user_id);
+    if (m) return m.last_sign_in_at ? `<span class="pill green">Active</span> <span class="meta">${ago(m.last_sign_in_at)}</span>` : '<span class="pill blue">Login ready</span>';
+    return k.invited_at ? `<span class="pill amber">Invited</span> <span class="meta">${ago(k.invited_at)}</span>` : '<span class="pill grey">Not invited</span>';
+  };
+  return `<div class="section card"><h2>${e.id ? 'Edit ' + esc(e.full_name) : 'Add a contact at ' + esc(S.client.name)}</h2>
+    <div class="note">Every portal user is a contact on this client. Their access follows what you set here: a <b>hiring manager</b> sees the full board for the searches you tick, an <b>interviewer</b> sees only the candidates you tick, each with a scorecard.</div>
     <div class="form-row">
-      <label class="field"><span>Email</span><input id="np_email" type="email"></label>
-      <label class="field"><span>Full name</span><input id="np_name"></label>
-      <label class="field"><span>Job title</span><input id="np_title"></label>
+      <label class="field"><span>Full name *</span><input id="ct_name" value="${esc(e.full_name || '')}" autocomplete="off"></label>
+      <label class="field"><span>Job title *</span><input id="ct_title" value="${esc(e.job_title || '')}" autocomplete="off"></label>
+      <label class="field"><span>Email address *</span><input id="ct_email" type="email" value="${esc(e.email || '')}" autocomplete="off"></label>
+      <label class="field"><span>Access *</span><select id="ct_access"><option value="hm" ${acc === 'hm' ? 'selected' : ''}>Hiring manager</option><option value="interviewer" ${acc === 'interviewer' ? 'selected' : ''}>Interviewer</option></select></label>
     </div>
-    <button class="btn btn-sm btn-primary" id="np_go">Link to ${esc(S.client.name)}</button></div>
-  ${S.members.length ? `<div class="card"><table class="table"><thead><tr><th>Name</th><th>Email</th><th>Title</th><th>Last sign-in</th><th></th></tr></thead><tbody>
-    ${S.members.map((m) => `<tr><td><b>${esc(m.full_name || '')}</b></td><td>${esc(m.email)}</td><td>${esc(m.job_title || '')}</td><td class="meta">${m.last_sign_in_at ? ago(m.last_sign_in_at) : 'Not yet'}</td>
-      <td><button class="btn-link" data-unlink="${m.user_id}" style="color:var(--red)">Remove access</button></td></tr>`).join('')}
-  </tbody></table></div>
-  <div class="section card" style="margin-top:16px"><h2>What each person sees</h2>
-    <div class="note">Leave everything blank and a person sees every search. Tick <b>Hiring manager</b> to give the full board for a search, or <b>Interviewer</b> to show only the candidates you assign them, each with a scorecard. Use <b>Preview as</b> on the portal to check their view.</div>
-    ${S.members.map(accessCard).join('')}
-  </div>` : '<div class="empty">No client logins yet.</div>'}`;
+    <div class="field"><span>Searches they can see *</span>
+      <div class="ckgrid">${S.searches.map((x) => `<label class="ck"><input type="checkbox" data-ct-search="${x.id}" ${sel.has(x.id) ? 'checked' : ''}> ${esc(x.title)} <span class="meta">${esc(x.ref || '')}</span></label>`).join('')}</div></div>
+    ${acc === 'interviewer' ? `<div class="field"><span>Candidates they interview</span>
+      <div class="ckgrid">${S.candidates.filter((c) => c.visible_to_client && sel.has(c.search_id)).map((c) => `<label class="ck"><input type="checkbox" data-ct-cand="${c.id}" ${csel.has(c.id) ? 'checked' : ''}> ${esc(c.full_name)} <span class="meta">${esc((S.searches.find((x) => x.id === c.search_id) || {}).ref || '')}</span></label>`).join('') || '<span class="meta">Tick a search above to pick candidates. Scorecard links from interview invites add candidates automatically.</span>'}</div></div>` : ''}
+    <button class="btn btn-sm btn-primary" id="ct_save">${e.id ? 'Save changes' : 'Add contact'}</button>
+    ${e.id ? '<button class="btn btn-sm btn-ghost" id="ct_cancel">Cancel</button>' : ''}
+  </div>
+  <div class="card"><h2 style="margin-top:0">People at ${esc(S.client.name)}</h2>
+  ${S.contacts.length ? `<table class="table"><thead><tr><th>Name</th><th>Email</th><th>Access</th><th>Searches</th><th>Portal</th><th></th></tr></thead><tbody>
+    ${S.contacts.map((k) => `<tr><td><b>${esc(k.full_name)}</b><div class="meta">${esc(k.job_title)}</div></td><td>${esc(k.email)}</td>
+      <td>${k.access === 'hm' ? 'Hiring manager' : 'Interviewer'}${k.access === 'interviewer' && k.candidate_ids.length ? `<div class="meta">${k.candidate_ids.length} candidate${k.candidate_ids.length === 1 ? '' : 's'}</div>` : ''}</td>
+      <td class="meta">${esc(refs(k.search_ids))}</td><td>${status(k)}</td>
+      <td style="white-space:nowrap"><button class="btn-link" data-ct-edit="${k.id}">Edit</button> · ${k.user_id && S.members.some((m) => m.user_id === k.user_id) ? '' : `<button class="btn-link" data-ct-invite="${k.id}">${k.invited_at ? 'Resend invite' : 'Send portal invite'}</button> · `}<button class="btn-link" data-ct-del="${k.id}" style="color:var(--red)">Remove</button></td></tr>`).join('')}
+  </tbody></table>
+  <p class="meta" style="margin:10px 0 0">The invite emails a secure sign-in link to talentoconsulting.ai/portal. Until your email server is connected in Supabase (Authentication, Emails, SMTP) it arrives as a plain Supabase email.</p>` : '<div class="empty">No contacts yet.</div>'}</div>`;
 }
 function accessCard(m) {
   const mine = S.roles.filter((r) => r.user_id === m.user_id);
@@ -335,6 +353,46 @@ function wire() {
   document.querySelectorAll('[data-client]').forEach((b) => (b.onclick = () => loadClient(S.clients.find((c) => c.id === b.dataset.client))));
   document.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => { S.tab = b.dataset.tab; render(); }));
   document.querySelectorAll('[data-file]').forEach((b) => (b.onclick = () => openFile(b.dataset.file)));
+  const ctVals = () => ({
+    full_name: val('ct_name'), job_title: val('ct_title'), email: (val('ct_email') || '').toLowerCase() || null, access: val('ct_access'),
+    search_ids: [...document.querySelectorAll('[data-ct-search]:checked')].map((x) => x.dataset.ctSearch),
+    candidate_ids: [...document.querySelectorAll('[data-ct-cand]:checked')].map((x) => x.dataset.ctCand) });
+  const ctAccess = document.getElementById('ct_access');
+  if (ctAccess) {
+    const keep = () => { S.editContact = { ...(S.editContact || {}), ...ctVals() }; render(); };
+    ctAccess.onchange = keep;
+    document.querySelectorAll('[data-ct-search]').forEach((x) => (x.onchange = () => { if (val('ct_access') === 'interviewer') keep(); }));
+  }
+  on('ct_cancel', () => { S.editContact = null; render(); });
+  on('ct_save', async (ev) => {
+    const v = ctVals();
+    if (!v.full_name || !v.job_title || !v.email || !v.access) return toast('Full name, job title, email and access are all required');
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v.email)) return toast('That email address does not look right');
+    if (!v.search_ids.length) return toast('Tick at least one search');
+    if (v.access === 'hm') v.candidate_ids = [];
+    ev.target.disabled = true;
+    const id = S.editContact && S.editContact.id;
+    const { error } = id ? await sb.from('client_contacts').update({ ...v, updated_at: new Date().toISOString() }).eq('id', id)
+                         : await sb.from('client_contacts').insert({ ...v, client_id: S.client.id });
+    if (!done(error && error.code === '23505' ? { message: 'That email is already a contact on ' + S.client.name } : error, id ? 'Contact saved' : 'Contact added')) { ev.target.disabled = false; return; }
+    S.editContact = null; loadClient(S.client);
+  });
+  document.querySelectorAll('[data-ct-edit]').forEach((b) => (b.onclick = () => { S.editContact = { ...S.contacts.find((k) => k.id === b.dataset.ctEdit) }; render(); window.scrollTo(0, 0); }));
+  document.querySelectorAll('[data-ct-del]').forEach((b) => (b.onclick = async () => {
+    const k = S.contacts.find((x) => x.id === b.dataset.ctDel);
+    if (!confirm('Remove ' + k.full_name + ' from ' + S.client.name + '? Their portal access to ' + S.client.name + ' ends straight away.')) return;
+    const { error } = await sb.from('client_contacts').delete().eq('id', k.id);
+    if (done(error, 'Contact removed')) loadClient(S.client);
+  }));
+  document.querySelectorAll('[data-ct-invite]').forEach((b) => (b.onclick = async () => {
+    const k = S.contacts.find((x) => x.id === b.dataset.ctInvite);
+    if (!confirm('Email ' + k.full_name + ' (' + k.email + ') a sign-in link to the ' + S.client.name + ' portal?')) return;
+    b.disabled = true;
+    const { error } = await sb.auth.signInWithOtp({ email: k.email, options: { shouldCreateUser: true, emailRedirectTo: location.origin + '/portal/', data: { full_name: k.full_name } } });
+    if (error) { b.disabled = false; return toast('Invite failed: ' + error.message); }
+    await sb.from('client_contacts').update({ invited_at: new Date().toISOString() }).eq('id', k.id);
+    toast('Invite sent to ' + k.email); loadClient(S.client);
+  }));
   document.querySelectorAll('[data-acc-save]').forEach((b) => (b.onclick = async () => {
     const uid = b.dataset.accSave, box = b.closest('[data-acc]');
     const roles = [...box.querySelectorAll('[data-acc-role]')].filter((x) => x.value).map((x) => ({ client_id: S.client.id, user_id: uid, search_id: x.dataset.accRole, access: x.value }));
